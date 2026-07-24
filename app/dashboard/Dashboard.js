@@ -38,6 +38,8 @@ let debtRows=[];
 let goalRows=[];
 let rowCounter=0;
 let lumpPaymentEdited=false;
+let lastSaveCap=0;
+let lastLeftover=0;
 
 function money(n){ return "$"+Math.round(n).toLocaleString("en-US"); }
 function getStartDate(){
@@ -91,6 +93,13 @@ function onDownModeChange(){
 function toggleCustomTargets(){
     let on=document.getElementById("customTargets").checked;
     document.getElementById("customTargetsBlock").style.display=on?"block":"none";
+    calculateAll();
+}
+
+function onAffordModeChange(){
+    let mode=document.getElementById("affordModeSelect").value;
+    document.getElementById("maxAffordBlock").style.display = mode==="max" ? "block" : "none";
+    document.getElementById("customPriceBlock").style.display = mode==="custom" ? "block" : "none";
     calculateAll();
 }
 
@@ -320,6 +329,76 @@ function buildPlanHTML(label,price,down,rate,years,checkIncome,closing,inc){
         <div style="margin-top:10px;text-align:center;" class="\${f.c}">\${f.t}\${inc?" · incl. escrow"+(pmi>0?"+PMI":""):" · P&I only"}</div></div>\`;
 }
 
+function buildMaxAffordColumn(label, term, downAmount, rate, monthlyCeiling, closingPct){
+    if(monthlyCeiling<=0) return \`<div class="plan"><h3>\${label}</h3><div class="big flag-bad">—</div><div style="text-align:center;font-size:13px;color:#ff8f88;">Enter your take-home pay above to see what you can afford.</div></div>\`;
+    let maxPrice=maxAffordablePrice(downAmount,rate,term,monthlyCeiling);
+    let loan=Math.max(0,maxPrice-downAmount);
+    let pi=calcMonthlyPayment(loan,rate,term);
+    let escrow=monthlyTaxMaint(maxPrice);
+    let pmi=monthlyPMI(maxPrice,downAmount);
+    let totalPayment=pi+escrow+pmi;
+    let closing=maxPrice*closingPct/100;
+    let downPct=maxPrice>0?(downAmount/maxPrice)*100:0;
+    let pmiLine = pmi>0
+        ? \`<div class="summary-line"><span>PMI</span><span>\${money(pmi)}</span></div>\`
+        : \`<div class="summary-line"><span>PMI</span><span class="flag-ok">None (\${downPct.toFixed(0)}%+ down)</span></div>\`;
+    return \`<div class="plan"><h3>\${label}</h3><div class="big">\${money(maxPrice)}</div>
+        <div class="summary-line"><span>Total Payment</span><span>\${money(totalPayment)}/mo</span></div>
+        <div class="summary-line"><span>Principal & Interest</span><span>\${money(pi)}</span></div>
+        <div class="summary-line"><span>Escrow (Tax/Ins/Maint)</span><span>\${money(escrow)}</span></div>
+        \${pmiLine}
+        <div class="summary-line"><span>Down Payment</span><span>\${money(downAmount)} (\${downPct.toFixed(1)}%)</span></div>
+        <div class="summary-line"><span>Est. Closing Costs</span><span>\${money(closing)}</span></div>
+        <div style="margin-top:10px;text-align:center;" class="flag-ok">Max price at your \${getTargetPaymentPct()}% payment target</div></div>\`;
+}
+
+// Solve for the highest home price affordable given a fixed down payment and a monthly
+// payment ceiling. Binary search: raising price grows the loan (more P&I) AND grows
+// escrow AND shrinks down% (more/bigger PMI) - all three push payment up, so payment(price)
+// is monotonic and a plain binary search converges.
+function maxAffordablePrice(downAmount, rate, term, monthlyCeiling){
+    if(monthlyCeiling<=0) return 0;
+    let lo=Math.max(0,downAmount), hi=Math.max(downAmount*10, 2000000);
+    for(let i=0;i<60;i++){
+        let mid=(lo+hi)/2;
+        let loan=Math.max(0,mid-downAmount);
+        let payment=calcMonthlyPayment(loan,rate,term)+monthlyTaxMaint(mid)+monthlyPMI(mid,downAmount);
+        if(payment<=monthlyCeiling) lo=mid; else hi=mid;
+    }
+    return lo;
+}
+
+// Inverse of maxAffordablePrice: for a FIXED price, solve for the minimum down payment
+// that brings the payment under the ceiling. Raising down shrinks the loan and shrinks/
+// removes PMI, so payment(down) is monotonic the other way - down search still converges.
+function requiredDownForPayment(price, rate, term, monthlyCeiling){
+    if(price<=0) return 0;
+    let lo=0, hi=price;
+    for(let i=0;i<60;i++){
+        let mid=(lo+hi)/2;
+        let loan=Math.max(0,price-mid);
+        let payment=calcMonthlyPayment(loan,rate,term)+monthlyTaxMaint(price)+monthlyPMI(price,mid);
+        if(payment<=monthlyCeiling) hi=mid; else lo=mid;
+    }
+    return hi;
+}
+
+// Inverts baseSavingsAtYear()'s exact compounding order to solve for the monthly
+// contribution needed to reach targetAmount by "years", given the current
+// hysaRate/existingSavings/existingInHysa state. Mirrors that function's math exactly so
+// plugging the result back into monthlySave reproduces targetAmount.
+function requiredMonthlySavingsForTarget(targetAmount, years){
+    let rate=numVal("hysaRate")/100, mr=rate/12, existing=numVal("existingSavings");
+    let inHysa=document.getElementById("existingInHysa").checked;
+    let months=Math.round(years*12);
+    if(months<=0) return Math.max(0, targetAmount-existing);
+    let fvExisting=(inHysa?existing:0)*Math.pow(1+mr,months);
+    let remainder=targetAmount-fvExisting-(inHysa?0:existing);
+    if(remainder<=0) return 0;
+    let annuityFactor = mr>0 ? (1+mr)*((Math.pow(1+mr,months)-1)/mr) : months;
+    return remainder/annuityFactor;
+}
+
 function rentPaidOverYears(years){ let rent=numVal("currentRent"),inc=numVal("rentIncrease")/100,t=0,y=rent*12; for(let i=0;i<years;i++){ t+=y; y*=(1+inc); } return t; }
 
 function savingsWithDebtPlan(years, debtFreeYears, freedMonthly){
@@ -520,6 +599,7 @@ function calculateAll(){
 
     let mortExtra=numVal("mortExtra");
     let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal-mortExtra;
+    lastLeftover=leftover;
     document.getElementById("incomeStat").textContent=money(takeHome);
     document.getElementById("expenseStat").textContent=money(expenses);
     document.getElementById("saveStat").textContent=money(monthlySave);
@@ -552,6 +632,7 @@ function calculateAll(){
 
     let pool=Math.max(0, takeHome - expenses - goalTotal - (anyDebt?baseMin:0));
     let saveCap=pool;
+    lastSaveCap=saveCap;
     let debtExtraCap=Math.max(0, pool - monthlySave);
     let mortExtraCap=Math.max(0, pool - extra);
     function applyCap(inputId, sliderId, capId, value, cap, label){
@@ -566,6 +647,18 @@ function calculateAll(){
     applyCap("monthlySave","monthlySaveSlider","monthlySaveCap",monthlySave,saveCap,"Drag to set house savings");
     applyCap("debtExtra","debtExtraSlider","debtExtraCap",extra,debtExtraCap,"Extra kills debt faster");
     applyCap("mortExtra","mortExtraSlider","mortExtraCap",mortExtra,mortExtraCap,"Extra principal pays the house off sooner");
+
+    // ---- Max-Afford mode: what price can they afford at their current savings pace ----
+    let maxCeiling = takeHome * getTargetPaymentPct()/100;
+    document.getElementById("maxAffordResult").innerHTML =
+        buildMaxAffordColumn("30 Year",30,projected,numVal("mortgageRate"),maxCeiling,numVal("closingCostPercent"))
+      + buildMaxAffordColumn("15 Year",15,projected,numVal("mortgageRate"),maxCeiling,numVal("closingCostPercent"));
+    let leftoverNoteEl=document.getElementById("leftoverApplyNote");
+    if(leftover>0.5){
+        leftoverNoteEl.innerHTML=\`You have \${money(leftover)}/month left over. <button type="button" style="width:auto;display:inline;padding:6px 12px;font-size:12px;margin-left:6px;" onclick="applyLeftoverToSavings()">Apply to Savings</button>\`;
+    } else {
+        leftoverNoteEl.innerHTML="";
+    }
 
     let price=numVal("homePrice"),rate=numVal("mortgageRate");
     let down=getDownPayment(price,projected);
@@ -601,12 +694,17 @@ function calculateAll(){
     let tgtDownPct=getTargetDownPct();
     let tgtPayPct=getTargetPaymentPct();
 
+    let gapEl=document.getElementById("gapNote");
+    let btnRow=document.getElementById("targetButtonsRow");
+
     if(price<=0){
         v.textContent=""; v.className="verdict";
         w.textContent="Enter a home price in the mortgage section above, and this will tell you the soonest you can responsibly buy.";
+        gapEl.innerHTML=""; btnRow.innerHTML="";
     } else if(!r30){
         v.textContent="Out of reach at current numbers."; v.className="verdict flag-bad";
         w.innerHTML=\`With today's price, rate, and savings, you can't reach \${tgtDownPct}% down with a payment at or under \${tgtPayPct}% of take-home, even after decades. Lowering the price, saving more each month, a longer loan term, or loosening the targets under Custom would bring it within reach.\`;
+        gapEl.innerHTML=""; btnRow.innerHTML="";
     } else {
         let rentAmt=numVal("currentRent");
         let buyMonths=Math.round(r30.year*12);
@@ -656,6 +754,29 @@ function calculateAll(){
         }
 
         w.innerHTML=parts.join("<br><br>");
+
+        // gap analysis: does the actual soonest-year match the Years Saving the user
+        // originally typed in Section 5's Down Payment Savings?
+        if(r30.paidOff){
+            gapEl.innerHTML=""; btnRow.innerHTML="";
+        } else if(r30.year<=saveYears){
+            gapEl.innerHTML=\`<span class="flag-ok">You're on track - at this pace you'll be ready by your \${saveYears}-year target (actually \${dateFromMonths(buyMonths)}).</span>\`;
+            btnRow.innerHTML="";
+        } else {
+            let requiredDown=Math.max(price*tgtDownPct/100, requiredDownForPayment(price,rate,30,maxCeiling));
+            let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
+            let extraNeeded=requiredMonthly-monthlySave;
+            if(extraNeeded>0.5){
+                gapEl.innerHTML=\`At your current pace, this takes \${r30.year} years instead of your \${saveYears}-year target. To hit \${saveYears} years instead, you'd need to save about <b>\${money(requiredMonthly)}/mo</b> (\${money(extraNeeded)} more than now).\`;
+                let affordable=requiredMonthly<=saveCap;
+                btnRow.innerHTML=\`<button type="button" onclick="acceptMaxAffordable()">Save the Max I Can Afford</button>\`
+                  + (affordable
+                      ? \`<button type="button" onclick="acceptTargetTimeline()">Hit My \${saveYears}-Year Target</button>\`
+                      : \`<button type="button" disabled style="opacity:0.5;cursor:not-allowed;" title="That's more than you can currently afford (max \${money(saveCap)}/mo)">Hit My \${saveYears}-Year Target</button>\`);
+            } else {
+                gapEl.innerHTML=""; btnRow.innerHTML="";
+            }
+        }
     }
 
     let loanAmt=Math.max(0, price-down);
@@ -747,6 +868,27 @@ window.toggleCollapse=toggleCollapse;
 window.toggleDownPayment=toggleDownPayment;
 window.onDownModeChange=onDownModeChange;
 window.toggleCustomTargets=toggleCustomTargets;
+window.onAffordModeChange=onAffordModeChange;
+window.acceptMaxAffordable=function(){
+    setMoney("monthlySave", lastSaveCap);
+    calculateAll();
+};
+window.applyLeftoverToSavings=function(){
+    if(lastLeftover>0.5){
+        setMoney("monthlySave", numVal("monthlySave")+lastLeftover);
+        calculateAll();
+    }
+};
+window.acceptTargetTimeline=function(){
+    let price=numVal("homePrice"), rate=numVal("mortgageRate");
+    let takeHome=getMonthlyTakeHome();
+    let saveYears=numVal("saveYears")||0;
+    let ceiling=takeHome*getTargetPaymentPct()/100;
+    let requiredDown=Math.max(price*getTargetDownPct()/100, requiredDownForPayment(price,rate,30,ceiling));
+    let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
+    setMoney("monthlySave", requiredMonthly);
+    calculateAll();
+};
 window.toggleDebtMode=toggleDebtMode;
 window.setDebtStrategy=setDebtStrategy;
 window.onSlider=onSlider;
@@ -892,33 +1034,9 @@ export default function Dashboard() {
 </div>
 </div>
 
-<!-- Cards 3-7 are collapsed for brevity in this file - the script initializes them -->
-<div class="card">
-<h2><span class="step">3</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
-<label>Monthly Amount Set Aside for a House</label>
-<input id="monthlySave" class="money" type="text" placeholder="$0">
-<input type="range" id="monthlySaveSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('monthlySave','monthlySaveSlider')">
-<div class="hint" id="monthlySaveCap" style="margin-top:2px;margin-bottom:12px;">Drag to set how much of your leftover goes to the house.</div>
-<div class="row2">
-<div><label>Years Saving</label><input id="saveYears" type="number" placeholder="3" value="3"></div>
-<div><label>HYSA Rate (%)</label><input id="hysaRate" type="number" placeholder="3" value="3"></div>
-</div>
-<label>Money Already Saved (optional)</label>
-<input id="existingSavings" class="money" type="text" placeholder="$0">
-<div class="toggle-row">
-<input type="checkbox" id="existingInHysa" checked>
-<label style="font-weight:normal;margin:0;">This is already in the HYSA earning interest</label>
-</div>
-<div class="result-box">
-<div class="rb-big num" id="downPaymentLump">$0</div>
-<div class="rb-label" id="downPaymentLumpLabel">saved for down payment</div>
-<div class="rb-sub num" id="savePercentSub"></div>
-</div>
-</div>
-
-<!-- 4 DEBT -->
+<!-- 3 DEBT (moved earlier - affects what's left over for house savings) -->
 <div class="card collapsed" id="debtCard">
-<h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">4</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">3</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="debtBody">
 <div style="padding-top:4px;"></div>
 <div id="debtLumpBlock">
@@ -960,9 +1078,9 @@ export default function Dashboard() {
 </div>
 </div>
 
-<!-- 5 GOALS -->
+<!-- 4 GOALS (moved earlier) -->
 <div class="card collapsed" id="goalCard">
-<h2 class="collapsible" onclick="toggleCollapse('goalCard')"><span class="step">5</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('goalCard')"><span class="step">4</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="goalBody">
 <div style="padding-top:4px;"></div>
 <div id="goalList"></div>
@@ -974,34 +1092,74 @@ export default function Dashboard() {
 </div>
 </div>
 
+<!-- 5 DOWN PAYMENT SAVINGS (moved later - now that debt/goals are accounted for) -->
+<div class="card">
+<h2><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
+<label>Monthly Amount Set Aside for a House</label>
+<input id="monthlySave" class="money" type="text" placeholder="$0">
+<input type="range" id="monthlySaveSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('monthlySave','monthlySaveSlider')">
+<div class="hint" id="monthlySaveCap" style="margin-top:2px;margin-bottom:12px;">Drag to set how much of your leftover goes to the house.</div>
+<div class="row2">
+<div><label>Years Saving</label><input id="saveYears" type="number" placeholder="3" value="3"></div>
+<div><label>HYSA Rate (%)</label><input id="hysaRate" type="number" placeholder="3" value="3"></div>
+</div>
+<label>Money Already Saved (optional)</label>
+<input id="existingSavings" class="money" type="text" placeholder="$0">
+<div class="toggle-row">
+<input type="checkbox" id="existingInHysa" checked>
+<label style="font-weight:normal;margin:0;">This is already in the HYSA earning interest</label>
+</div>
+<div class="result-box">
+<div class="rb-big num" id="downPaymentLump">$0</div>
+<div class="rb-label" id="downPaymentLumpLabel">saved for down payment</div>
+<div class="rb-sub num" id="savePercentSub"></div>
+</div>
+</div>
+
 </div>
 
 <div class="dashboard" style="margin-top:20px;">
 
 <div class="card wide">
-<h2>Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span></h2>
-<div class="stat-grid">
-<div class="stat"><div class="big num" id="incomeStat">$0</div><div class="label">Take-Home</div></div>
-<div class="stat"><div class="big num" id="expenseStat">$0</div><div class="label">Expenses</div><div class="subpct" id="expenseStatPct"></div></div>
-<div class="stat"><div class="big num" id="saveStat">$0</div><div class="label">Down Pmt Savings</div><div class="subpct" id="saveStatPct"></div></div>
-<div class="stat"><div class="big num" id="debtStat">$0</div><div class="label">Debt Payment</div><div class="subpct" id="debtStatPct"></div></div>
-<div class="stat"><div class="big num" id="goalStat">$0</div><div class="label">Goals</div><div class="subpct" id="goalStatPct"></div></div>
-<div class="stat"><div class="big num" id="leftoverStat">$0</div><div class="label">Left Over</div><div class="subpct" id="leftoverStatPct"></div></div>
-</div>
-<div class="hint" id="overviewNote" style="margin-top:14px;text-align:center;"></div>
-</div>
+<h2>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
 
-<div class="card wide">
-<h2>Mortgage: 15yr vs 30yr <span class="info hinfo" title="Compares a 15-year and 30-year loan side by side.">i</span></h2>
 <div class="row2">
-<div><label>Home Price</label><input id="homePrice" class="money" type="text" placeholder="$0"></div>
 <div><label>Mortgage Interest Rate (%)</label><input id="mortgageRate" type="number" placeholder="6.5" value="6.5"></div>
+<div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3" value="3"></div>
+</div>
+<div class="row2">
+<div><label>Property Tax + Insurance + Maint. (%/yr, est.) <span class="info" title="A combined rough estimate: property tax + homeowners insurance + a maintenance/upkeep reserve, as a % of home price per year. Real lender escrow accounts only hold tax + insurance (+ PMI if under 20% down) — the maintenance portion here is a personal reserve baked into this one number for simplicity, not something the bank collects.">i</span></label><input id="taxMaintPercent" type="number" placeholder="1.5" value="1.5"></div>
+<div style="display:flex;align-items:flex-end;">
+<div class="toggle-row" style="margin-bottom:16px;">
+<input type="checkbox" id="showPmi" onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Show PMI detail if under 20% down<span class="info" title="If your down payment is below 20%, this shows the estimated monthly PMI.">i</span></label>
+</div>
+</div>
+</div>
+<div class="result-box" id="pmiBox" style="display:none;text-align:left;padding:14px 16px;margin-bottom:16px;">
+<div class="rb-sub" id="pmiReadout" style="margin-top:0;"></div>
 </div>
 <div class="toggle-row">
-<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
-<label style="font-weight:normal;margin:0;">Use my projected savings balance as the down payment</label>
+<input type="checkbox" id="includeTaxMaint" checked onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Count escrow (tax/insurance/PMI) toward the affordability guideline <span class="info" title="Escrow and PMI are always shown as their own line in the payment breakdown below. This only controls whether they count toward the 28%/36% affordability percentage — some guidelines quote Principal & Interest only, others quote the full payment.">i</span></label>
 </div>
-<div class="row2">
+
+<label>What do you want to see?</label>
+<select id="affordModeSelect" onchange="onAffordModeChange()">
+<option value="max">Max Home Price I Can Afford</option>
+<option value="custom">How Long For a Specific Price</option>
+</select>
+
+<div id="maxAffordBlock">
+<div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
+<div class="compare" id="maxAffordResult" style="margin-top:10px;"></div>
+<button type="button" style="margin-top:10px;" onclick="acceptMaxAffordable()">Save the Max I Can Afford</button>
+<div class="hint" id="leftoverApplyNote" style="margin-top:10px;"></div>
+</div>
+
+<div id="customPriceBlock" style="display:none;">
+<div class="row2" style="margin-top:10px;">
+<div><label>Home Price</label><input id="homePrice" class="money" type="text" placeholder="$0"></div>
 <div>
 <label>Down Payment (type a $ amount or a %)<span class="info" title="Put down 20% or more and you skip PMI.">i</span></label>
 <div class="field-suffix">
@@ -1009,33 +1167,17 @@ export default function Dashboard() {
 <div><select id="downPaymentMode" onchange="onDownModeChange()"><option value="dollar">$</option><option value="percent">%</option></select></div>
 </div>
 </div>
-<div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3" value="3"></div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
+<label style="font-weight:normal;margin:0;">Use my projected savings balance as the down payment</label>
 </div>
 <div class="result-box" id="downResultBox" style="margin-top:6px;margin-bottom:16px;text-align:left;padding:14px 16px;">
 <div class="rb-sub num" id="downReadout" style="margin-top:0;"></div>
 </div>
-<div class="toggle-row">
-<input type="checkbox" id="showPmi" onchange="calculateAll()">
-<label style="font-weight:normal;margin:0;">Show PMI detail if under 20% down<span class="info" title="If your down payment is below 20%, this shows the estimated monthly PMI.">i</span></label>
-</div>
-<div class="result-box" id="pmiBox" style="display:none;text-align:left;padding:14px 16px;margin-bottom:16px;">
-<div class="rb-sub" id="pmiReadout" style="margin-top:0;"></div>
-</div>
-<div class="row2">
-<div><label>Property Tax + Insurance + Maint. (%/yr, est.) <span class="info" title="A combined rough estimate: property tax + homeowners insurance + a maintenance/upkeep reserve, as a % of home price per year. Real lender escrow accounts only hold tax + insurance (+ PMI if under 20% down) — the maintenance portion here is a personal reserve baked into this one number for simplicity, not something the bank collects.">i</span></label><input id="taxMaintPercent" type="number" placeholder="1.5" value="1.5"></div>
-<div style="display:flex;align-items:flex-end;">
-<div class="toggle-row" style="margin-bottom:16px;">
-<input type="checkbox" id="includeTaxMaint" checked onchange="calculateAll()">
-<label style="font-weight:normal;margin:0;">Count escrow (tax/insurance/PMI) toward the 28% affordability guideline <span class="info" title="Escrow and PMI are always shown as their own line in the payment breakdown below. This only controls whether they count toward the 28%/36% affordability percentage — some guidelines quote Principal & Interest only, others quote the full payment.">i</span></label>
-</div>
-</div>
-</div>
 <div class="compare" id="compareResult"></div>
-</div>
 
-<div class="card wide">
-<h2>Optimal Plan: When Can You Responsibly Buy? <span class="info hinfo" title="Puts it all together.">i</span></h2>
-<div class="row2">
+<div class="row2" style="margin-top:16px;">
 <div><label>Plan Start Date <span class="info" title="Everything counts forward from this date. It's saved automatically, so if you entered a test date before, it'll keep loading that instead of today until you change it or click Reset.">i</span></label><div class="field-suffix"><div><input id="startDate" type="date"></div><div><button type="button" style="padding:10px 8px;font-size:12px;" onclick="resetStartDateToToday()">Reset</button></div></div></div>
 <div><label>Current Monthly Rent</label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
 </div>
@@ -1058,10 +1200,14 @@ export default function Dashboard() {
 <div><label>Max Payment (% of take-home)</label><input id="targetPaymentPct" type="number" placeholder="28"></div>
 </div>
 </div>
+
+<div class="compare" id="optimalResult" style="margin-top:14px;"></div>
 <div class="writeup" id="optimalWriteup" style="font-size:14.5px;color:var(--ink);"></div>
 <div class="verdict" id="optimalVerdict"></div>
-<div class="compare" id="optimalResult" style="margin-top:14px;"></div>
+<div class="hint" id="gapNote" style="margin-top:12px;"></div>
+<div id="targetButtonsRow" style="display:flex;gap:10px;margin-top:10px;"></div>
 <div class="hint" style="margin-top:12px;">Assumes today's price and rate hold steady.</div>
+</div>
 </div>
 
 <div class="card wide">
@@ -1072,6 +1218,19 @@ export default function Dashboard() {
 <div class="hint" id="mortExtraCap" style="margin-top:2px;margin-bottom:14px;">Models life after buying.</div>
 <div class="compare" id="customPayoffResult"></div>
 <div class="writeup" id="milestoneWriteup"></div>
+</div>
+
+<div class="card wide">
+<h2>Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span></h2>
+<div class="stat-grid">
+<div class="stat"><div class="big num" id="incomeStat">$0</div><div class="label">Take-Home</div></div>
+<div class="stat"><div class="big num" id="expenseStat">$0</div><div class="label">Expenses</div><div class="subpct" id="expenseStatPct"></div></div>
+<div class="stat"><div class="big num" id="saveStat">$0</div><div class="label">Down Pmt Savings</div><div class="subpct" id="saveStatPct"></div></div>
+<div class="stat"><div class="big num" id="debtStat">$0</div><div class="label">Debt Payment</div><div class="subpct" id="debtStatPct"></div></div>
+<div class="stat"><div class="big num" id="goalStat">$0</div><div class="label">Goals</div><div class="subpct" id="goalStatPct"></div></div>
+<div class="stat"><div class="big num" id="leftoverStat">$0</div><div class="label">Left Over</div><div class="subpct" id="leftoverStatPct"></div></div>
+</div>
+<div class="hint" id="overviewNote" style="margin-top:14px;text-align:center;"></div>
 </div>
 
 </div>
