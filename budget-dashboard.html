@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Buying Readiness Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+    --ink:#111111; --ink-soft:#555555; --ink-faint:#8a8a8a;
+    --line:#e4e4e4; --line-strong:#cccccc; --paper:#fff; --page:#f4f4f4;
+    --dark:#121212; --dark-line:rgba(255,255,255,0.14);
+    --ok:#1f7a3d; --warn:#8a6d00; --bad:#b3261e;
+    --font:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
+}
+* { box-sizing:border-box; }
+body { font-family:var(--font); max-width:1080px; margin:0 auto; padding:56px 24px 96px; background:var(--page); color:var(--ink); -webkit-font-smoothing:antialiased; }
+h1 { text-align:center; font-size:30px; font-weight:700; letter-spacing:-0.025em; margin:0 0 6px; }
+.subtitle { text-align:center; color:var(--ink-faint); font-size:14px; margin:0 0 32px; }
+.num,.stat .big,.plan .big,.summary-line span:last-child,input.money,.rb-big { font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1; }
+
+.step { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; font-weight:600; margin-right:9px; flex:none; }
+
+.filebar { display:flex; justify-content:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.filebar button { width:auto; padding:9px 16px; font-size:13px; font-weight:500; background:transparent; color:var(--ink); border:1px solid var(--line-strong); }
+.filebar button:hover { background:var(--ink); color:#fff; border-color:var(--ink); }
+.filebar button.danger:hover { background:var(--bad); border-color:var(--bad); }
+.saveMsg { text-align:center; font-size:12px; color:var(--ink-faint); margin-bottom:28px; min-height:16px; font-variant-numeric:tabular-nums; }
+
+.dashboard { display:flex; flex-wrap:wrap; gap:16px; }
+.card { flex:1 1 320px; background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:24px; }
+.card.wide { flex:1 1 100%; }
+.card h2 { margin:0 0 18px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:var(--ink-soft); padding-bottom:12px; border-bottom:1px solid var(--line); display:flex; align-items:center; }
+.card h2.collapsible { cursor:pointer; user-select:none; }
+.card h2.collapsible .chevron { margin-left:auto; font-size:15px; transition:transform 0.22s ease; color:var(--ink-faint); font-weight:400; }
+.card.collapsed h2.collapsible { margin-bottom:0; border-bottom:none; padding-bottom:0; }
+.card.collapsed h2.collapsible .chevron { transform:rotate(-90deg); }
+.collapse-body { overflow:hidden; transition:max-height 0.28s ease, opacity 0.2s ease; }
+.card.collapsed .collapse-body { max-height:0 !important; opacity:0; }
+
+label { font-weight:500; font-size:12px; letter-spacing:0.01em; color:var(--ink-soft); display:block; }
+input,select { width:100%; padding:10px 12px; margin-top:5px; margin-bottom:16px; font-size:15px; font-family:var(--font); box-sizing:border-box; border:1px solid var(--line-strong); border-radius:4px; background:#fff; color:var(--ink); transition:border-color 0.12s ease; }
+input:focus,select:focus { outline:none; border-color:var(--ink); }
+input::placeholder { color:#bbb; }
+.locked { background:#f6f6f6; color:var(--ink-faint); }
+.estimated { color:var(--ink-faint); font-style:italic; }
+.row2 { display:flex; gap:12px; } .row2 > div { flex:1; }
+
+.toggle-row { display:flex; align-items:center; gap:9px; margin-bottom:16px; font-size:13px; color:var(--ink-soft); }
+.toggle-row input { width:auto; margin:0; }
+
+button { width:100%; padding:12px; background:var(--ink); color:#fff; border:1px solid var(--ink); border-radius:4px; font-size:14px; font-weight:500; cursor:pointer; transition:opacity 0.12s ease; font-family:var(--font); }
+button:hover { opacity:0.82; }
+button.add-btn { background:transparent; color:var(--ink); border:1px dashed var(--line-strong); font-size:13px; padding:10px; margin-top:4px; }
+button.add-btn:hover { background:#f6f6f6; opacity:1; border-color:var(--ink); }
+.remove-x { width:auto; background:transparent; color:var(--ink-faint); border:none; padding:0 6px; font-size:18px; line-height:1; cursor:pointer; align-self:flex-start; margin-top:6px; }
+.remove-x:hover { color:var(--bad); opacity:1; }
+
+/* labelled field: input with small caption underneath */
+.lf { margin-bottom:0; }
+.lf .cap { font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-faint); margin-top:3px; text-align:left; }
+.lf input { margin-bottom:0; }
+
+.list-row { display:flex; gap:8px; align-items:flex-start; padding:12px; margin-bottom:10px; border:1px solid var(--line); border-radius:5px; background:#fafafa; }
+.list-row > div { flex:1; }
+
+.pillset { display:flex; gap:8px; margin:4px 0 10px; }
+.pill { flex:1; text-align:center; padding:9px; font-size:12.5px; border:1px solid var(--line-strong); border-radius:4px; cursor:pointer; color:var(--ink-soft); background:#fff; transition:all 0.12s; display:flex; align-items:center; justify-content:center; gap:5px; }
+.pill.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+.info { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; border:1px solid currentColor; font-size:10px; font-style:italic; cursor:help; opacity:0.7; }
+.hinfo { width:16px; height:16px; font-size:10px; opacity:0.55; vertical-align:middle; }
+
+.stat { text-align:center; padding:14px 0 4px; }
+.stat .big { font-size:26px; font-weight:600; letter-spacing:-0.02em; }
+.stat .label { font-size:11px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-faint); margin-top:4px; }
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
+.stat-grid .stat { border:1px solid var(--line); border-radius:4px; padding:16px 8px; }
+.stat .subpct { font-size:11px; font-variant-numeric:tabular-nums; margin-top:3px; color:var(--ink-faint); }
+.minipct { font-size:10.5px; color:var(--ink-faint); font-variant-numeric:tabular-nums; margin-top:3px; margin-bottom:16px; }
+
+input[type=range].slider {
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; padding:0;
+    background:var(--line-strong); border:none; border-radius:2px; margin:8px 0 0; cursor:pointer;
+}
+input[type=range].slider::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--ink); cursor:pointer; border:none;
+}
+input[type=range].slider::-moz-range-thumb {
+    width:16px; height:16px; border-radius:50%; background:var(--ink); cursor:pointer; border:none;
+}
+input.over { border-color:var(--bad); color:var(--bad); }
+.flag-ok { color:var(--ok); } .flag-warn { color:var(--warn); } .flag-bad { color:var(--bad); }
+
+.result-box { margin-top:16px; padding:16px; border-radius:5px; background:#f0f0f0; text-align:center; }
+.result-box .rb-big { font-size:24px; font-weight:600; letter-spacing:-0.02em; }
+.result-box .rb-label { font-size:11px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-faint); margin-top:3px; }
+.result-box .rb-sub { font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.5; }
+
+.compare { display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; }
+.plan { flex:1 1 220px; background:var(--dark); color:#fff; border-radius:6px; padding:22px; }
+.plan h3 { margin:0 0 4px; text-align:center; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.12em; color:rgba(255,255,255,0.6); }
+.plan .big { font-size:24px; font-weight:600; text-align:center; margin:6px 0 14px; letter-spacing:-0.02em; }
+.summary-line { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--dark-line); font-size:13px; color:rgba(255,255,255,0.82); gap:10px; }
+.summary-line:last-child { border-bottom:none; }
+.summary-line span:last-child { text-align:right; }
+.plan .flag-ok { color:#63d089; font-weight:600; } .plan .flag-warn { color:#e6c34d; font-weight:600; } .plan .flag-bad { color:#ff8f88; font-weight:600; }
+
+.verdict { margin-top:14px; text-align:center; font-weight:600; font-size:15px; }
+.writeup { margin-top:14px; padding:14px 16px; background:#f0f0f0; border-radius:5px; font-size:13.5px; line-height:1.6; color:var(--ink-soft); }
+.hint { font-size:12px; color:var(--ink-faint); line-height:1.5; }
+.field-suffix { display:flex; gap:8px; align-items:flex-start; }
+.field-suffix > div:first-child { flex:1; }
+.field-suffix > div:last-child { width:76px; }
+
+@media (max-width:640px){ body{padding:32px 16px 64px;} }
+
+</style>
+</head>
+
+<body>
+
+<h1>Home Buying Readiness Dashboard</h1>
+<p class="subtitle">See whether renting or buying makes sense, and how soon you'll be ready. Fill in each section top to bottom: income first, then spending, saving, debt, and the house.</p>
+
+<div class="filebar">
+<button class="secondary" onclick="saveAsFile()">Save As...</button>
+<button class="secondary" onclick="saveOverwrite()">Overwrite Last Saved File</button>
+<button class="secondary" onclick="loadFromFile()">Load Saved File</button>
+<button class="secondary danger" onclick="clearAll()">Clear All</button>
+</div>
+<div class="saveMsg" id="saveMsg"></div>
+<input type="file" id="fallbackFileInput" accept=".json" style="display:none;">
+
+<div class="dashboard">
+
+<!-- 1 TAKE HOME -->
+<div class="card">
+<h2><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span></h2>
+<label>Household</label>
+<select id="householdType" onchange="onHouseholdTypeChange()">
+<option value="single">Single</option>
+<option value="couple">Couple</option>
+</select>
+<div class="toggle-row">
+<input type="checkbox" id="calcFromGross" onchange="onIncomeModeChange()">
+<label style="font-weight:normal;margin:0;">Estimate take-home from gross salary + state</label>
+</div>
+<div id="singleManualBlock">
+<label>Yearly Take-Home Pay</label>
+<input id="yearlyIncomeSingle" class="money" type="text" placeholder="$0">
+</div>
+<div id="coupleManualBlock" style="display:none;">
+<div class="row2">
+<div><label>Person 1 Take-Home</label><input id="yearlyIncomePerson1" class="money" type="text" placeholder="$0"></div>
+<div><label>Person 2 Take-Home</label><input id="yearlyIncomePerson2" class="money" type="text" placeholder="$0"></div>
+</div>
+</div>
+<div id="grossIncomeBlock" style="display:none;">
+<label>State</label>
+<select id="stateSelect"></select>
+<div id="grossSingleBlock">
+<label>Gross Yearly Salary</label>
+<input id="grossSingle" class="money" type="text" placeholder="$0">
+</div>
+<div id="grossCoupleBlock" style="display:none;">
+<div class="row2">
+<div><label>Person 1 Gross Salary</label><input id="grossPerson1" class="money" type="text" placeholder="$0"></div>
+<div><label>Person 2 Gross Salary</label><input id="grossPerson2" class="money" type="text" placeholder="$0"></div>
+</div>
+</div>
+<div id="taxBreakdown" class="hint" style="margin-top:-4px;margin-bottom:12px;"></div>
+</div>
+<div id="incomeTotalLine" class="hint" style="margin-top:-6px;margin-bottom:12px;"></div>
+<label>Monthly Take-Home (optional, overrides yearly ÷ 12)</label>
+<input id="monthlyIncomeOverride" class="money" type="text" placeholder="$0">
+<div class="result-box">
+<div class="rb-big num" id="monthlyIncomeResult">$0</div>
+<div class="rb-label">take-home per month</div>
+<div class="rb-sub num" id="grossNetCompare"></div>
+</div>
+<div class="hint" style="margin-top:10px;">Tax estimate is approximate, not tax advice. Toggle the box above to compare your numbers with and without estimated tax; both are kept as you switch.</div>
+</div>
+
+<!-- 2 EXPENSES -->
+<div class="card">
+<h2><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span></h2>
+<label>Quick-Fill Preset</label>
+<select id="expensePreset" onchange="applyPreset()">
+<option value="custom">Custom (enter your own)</option>
+<option value="single">Average Single Person</option>
+<option value="married">Average Married / Couple</option>
+</select>
+<div class="row2">
+<div><label>Rent / Housing</label><input id="expRent" class="money" type="text" placeholder="$0"><div class="minipct" id="rentPct"></div></div>
+<div><label>Utilities</label><input id="expUtilities" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="row2">
+<div><label>Groceries</label><input id="expGroceries" class="money" type="text" placeholder="$0"></div>
+<div><label>Gas / Transport</label><input id="expGas" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="row2">
+<div><label>Insurance</label><input id="expInsurance" class="money" type="text" placeholder="$0"></div>
+<div><label>Subscriptions</label><input id="expSubs" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="row2">
+<div><label>Phone</label><input id="expPhone" class="money" type="text" placeholder="$0"></div>
+<div><label>Other / Misc</label><input id="expOther" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="result-box">
+<div class="rb-big num" id="expenseResult">$0</div>
+<div class="rb-label">total monthly expenses</div>
+<div class="rb-sub num" id="expensePctSub"></div>
+</div>
+</div>
+
+<!-- 3 DOWN PAYMENT SAVINGS -->
+<div class="card">
+<h2><span class="step">3</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved. This grows into your down payment. Slide it up to put more of your leftover toward the house.">i</span></h2>
+<label>Monthly Amount Set Aside for a House</label>
+<input id="monthlySave" class="money" type="text" placeholder="$0">
+<input type="range" id="monthlySaveSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('monthlySave','monthlySaveSlider')">
+<div class="hint" id="monthlySaveCap" style="margin-top:2px;margin-bottom:12px;">Drag to set how much of your leftover goes to the house.</div>
+<div class="row2">
+<div><label>Years Saving</label><input id="saveYears" type="number" placeholder="5"></div>
+<div><label>HYSA Rate (%)</label><input id="hysaRate" type="number" placeholder="4"></div>
+</div>
+<label>Money Already Saved (optional)</label>
+<input id="existingSavings" class="money" type="text" placeholder="$0">
+<div class="toggle-row">
+<input type="checkbox" id="existingInHysa" checked>
+<label style="font-weight:normal;margin:0;">This is already in the HYSA earning interest</label>
+</div>
+<div class="result-box">
+<div class="rb-big num" id="downPaymentLump">$0</div>
+<div class="rb-label" id="downPaymentLumpLabel">saved for down payment</div>
+<div class="rb-sub num" id="savePercentSub"></div>
+</div>
+</div>
+
+<!-- 4 DEBT -->
+<div class="card collapsed" id="debtCard">
+<h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">4</span>Debt Payoff <span class="info hinfo" title="Any debt you carry (cards, loans). The tool figures out how long to pay it off, and being debt-free first is the default before buying a house.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="debtBody">
+<div style="padding-top:4px;"></div>
+
+<!-- lump sum mode -->
+<div id="debtLumpBlock">
+<div class="row2">
+<div class="lf"><input id="lumpBalance" class="money" type="text" placeholder="$0"><div class="cap">Total Debt Balance</div></div>
+<div class="lf"><input id="lumpRate" type="number" placeholder="0"><div class="cap">Avg Interest Rate %</div></div>
+</div>
+<div style="height:14px;"></div>
+<div class="lf" style="margin-bottom:14px;">
+<input id="lumpPayment" class="money" type="text" placeholder="~$0">
+<div class="cap">Monthly Payment <span id="lumpPayHint"></span></div>
+</div>
+</div>
+
+<!-- per-debt mode -->
+<div id="debtListBlock" style="display:none;">
+<div id="debtList"></div>
+<button class="add-btn" onclick="addDebtRow()">+ Add a debt</button>
+</div>
+
+<div class="toggle-row" style="margin-top:6px;">
+<input type="checkbox" id="perDebtMode" onchange="toggleDebtMode()">
+<label style="font-weight:normal;margin:0;">Break into individual debts</label>
+</div>
+
+<!-- strategy now BELOW the checkbox, only in per-debt mode -->
+<div id="strategyBlock" style="display:none;">
+<label>Payoff Strategy</label>
+<div class="pillset">
+<div class="pill" id="pillEven" onclick="setDebtStrategy('even')">Even <span class="info" title="Even: split your extra money equally across every debt. Simple and balanced. No single debt gets priority.">i</span></div>
+<div class="pill" id="pillHighInterest" onclick="setDebtStrategy('interest')">Avalanche <span class="info" title="Avalanche: pay the highest interest rate first. Saves the most money overall, but progress can feel slow and it's harder to track.">i</span></div>
+<div class="pill" id="pillSmallBalance" onclick="setDebtStrategy('balance')">Snowball <span class="info" title="Snowball: pay the smallest balance first. Costs a little more interest, but you clear whole debts fast, which frees up payments sooner and feels motivating on a tight budget.">i</span></div>
+</div>
+</div>
+
+<label>Extra Toward Debt Each Month (optional)</label>
+<input id="debtExtra" class="money" type="text" placeholder="$0">
+<input type="range" id="debtExtraSlider" class="slider" min="0" max="1000" value="0" oninput="onSlider('debtExtra','debtExtraSlider')">
+<div class="hint" id="debtExtraCap" style="margin-top:2px;margin-bottom:14px;">Drag to use leftover money. Anything above the minimum kills debt faster.</div>
+
+<div class="result-box">
+<div class="rb-big" id="debtPayoffResult">No debt entered</div>
+<div class="rb-label" id="debtPayoffLabel"></div>
+<div class="rb-sub" id="debtExtraNote"></div>
+</div>
+</div>
+</div>
+
+<!-- 5 GOALS -->
+<div class="card collapsed" id="goalCard">
+<h2 class="collapsible" onclick="toggleCollapse('goalCard')"><span class="step">5</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip). Each one takes a monthly contribution that competes with your house savings.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="goalBody">
+<div style="padding-top:4px;"></div>
+<div id="goalList"></div>
+<button class="add-btn" onclick="addGoalRow()">+ Add a goal</button>
+<div class="result-box">
+<div class="rb-big num" id="goalTotalResult">$0</div>
+<div class="rb-label">total goal contributions / month</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="dashboard" style="margin-top:20px;">
+
+<div class="card wide">
+<h2>Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home: what goes to expenses, savings, debt, and goals, and what's left over.">i</span></h2>
+<div class="stat-grid">
+<div class="stat"><div class="big num" id="incomeStat">$0</div><div class="label">Take-Home</div></div>
+<div class="stat"><div class="big num" id="expenseStat">$0</div><div class="label">Expenses</div><div class="subpct" id="expenseStatPct"></div></div>
+<div class="stat"><div class="big num" id="saveStat">$0</div><div class="label">Down Pmt Savings</div><div class="subpct" id="saveStatPct"></div></div>
+<div class="stat"><div class="big num" id="debtStat">$0</div><div class="label">Debt Payment</div><div class="subpct" id="debtStatPct"></div></div>
+<div class="stat"><div class="big num" id="goalStat">$0</div><div class="label">Goals</div><div class="subpct" id="goalStatPct"></div></div>
+<div class="stat"><div class="big num" id="leftoverStat">$0</div><div class="label">Left Over</div><div class="subpct" id="leftoverStatPct"></div></div>
+</div>
+<div class="hint" id="overviewNote" style="margin-top:14px;text-align:center;"></div>
+</div>
+
+<div class="card wide">
+<h2>Mortgage: 15yr vs 30yr <span class="info hinfo" title="Compares a 15-year and 30-year loan side by side at your home price, down payment, and rate. Shows the monthly payment and whether it fits the 28% guideline.">i</span></h2>
+<div class="row2">
+<div><label>Home Price</label><input id="homePrice" class="money" type="text" placeholder="$0"></div>
+<div><label>Mortgage Interest Rate (%)</label><input id="mortgageRate" type="number" placeholder="6.5"></div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
+<label style="font-weight:normal;margin:0;">Use my projected savings balance (Step 3) as the down payment</label>
+</div>
+<div class="row2">
+<div>
+<label>Down Payment (type a $ amount or a %) <span class="info" title="Put down 20% or more and you skip PMI (private mortgage insurance). Below 20%, lenders add PMI, roughly 0.3%–1.15% of the loan per year, until you reach 20% equity. This tool estimates it for you.">i</span></label>
+<div class="field-suffix">
+<div><input id="downPayment" class="money locked" type="text" placeholder="$0" readonly></div>
+<div><select id="downPaymentMode" onchange="onDownModeChange()"><option value="dollar">$</option><option value="percent">%</option></select></div>
+</div>
+</div>
+<div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3"></div>
+</div>
+<div class="result-box" id="downResultBox" style="margin-top:6px;margin-bottom:16px;text-align:left;padding:14px 16px;">
+<div class="rb-sub num" id="downReadout" style="margin-top:0;"></div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="showPmi" onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Show PMI detail if under 20% down <span class="info" title="If your down payment is below 20%, this shows the estimated monthly PMI and how long until you reach 20% equity and can drop it. PMI is included in the affordability check either way.">i</span></label>
+</div>
+<div class="result-box" id="pmiBox" style="display:none;text-align:left;padding:14px 16px;margin-bottom:16px;">
+<div class="rb-sub" id="pmiReadout" style="margin-top:0;"></div>
+</div>
+<div class="row2">
+<div><label>Property Tax + Maint. (%/yr)</label><input id="taxMaintPercent" type="number" placeholder="1.5"></div>
+<div style="display:flex;align-items:flex-end;">
+<div class="toggle-row" style="margin-bottom:16px;">
+<input type="checkbox" id="includeTaxMaint" onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Include tax + maintenance in affordability</label>
+</div>
+</div>
+</div>
+<div class="compare" id="compareResult"></div>
+</div>
+
+<div class="card wide">
+<h2>Optimal Plan: When Can You Responsibly Buy? <span class="info hinfo" title="Puts it all together: the soonest you can buy with enough down payment AND a payment under your affordability target. Defaults to 20% down and 28% of take-home; check Custom Targets to change them.">i</span></h2>
+<div class="row2">
+<div><label>Plan Start Date <span class="info" title="Everything counts forward from this date. Defaults to today; change it to plan from a future date.">i</span></label><input id="startDate" type="date"></div>
+<div><label>Current Monthly Rent <span class="info" title="Pulled from your Rent / Housing expense in Step 2 so it always matches. Shows how much rent you'll spend while saving up, the real cost of waiting.">i</span></label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
+</div>
+<div class="row2">
+<div><label>Annual Rent Increase (%) <span class="info" title="How much your rent rises each year while you wait. 3% is a common estimate.">i</span></label><input id="rentIncrease" type="number" placeholder="3"></div>
+<div style="display:flex;align-items:flex-end;">
+<div class="toggle-row" style="margin-bottom:16px;">
+<input type="checkbox" id="debtFreeFirst" checked onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Be debt-free before buying <span class="info" title="On (recommended): clear your debt first, then build the down payment, and your freed-up debt payment rolls into savings. Off: buy as soon as you hit the target even while still carrying debt (the affordability check then counts your debt payment too).">i</span></label>
+</div>
+</div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="customTargets" onchange="toggleCustomTargets()">
+<label style="font-weight:normal;margin:0;">Custom targets <span class="info" title="By default the plan requires 20% down (avoids PMI) and keeps the payment at or under 28% of take-home (the classic affordability line). Check this to set your own, for example 10% down or a 30% payment ceiling.">i</span></label>
+</div>
+<div id="customTargetsBlock" style="display:none;">
+<div class="row2">
+<div><label>Target Down Payment (%) <span class="info" title="20% avoids PMI. Lower gets you in sooner but adds PMI until you reach 20% equity.">i</span></label><input id="targetDownPct" type="number" placeholder="20"></div>
+<div><label>Max Payment (% of take-home) <span class="info" title="28% is the common guideline lenders use. Some stretch to 36%. Higher means you qualify sooner but a tighter monthly budget.">i</span></label><input id="targetPaymentPct" type="number" placeholder="28"></div>
+</div>
+</div>
+<div class="writeup" id="optimalWriteup" style="font-size:14.5px;color:var(--ink);"></div>
+<div class="verdict" id="optimalVerdict"></div>
+<div class="compare" id="optimalResult" style="margin-top:14px;"></div>
+<div class="hint" style="margin-top:12px;">Assumes today's price and rate hold steady. It can't predict home appreciation or rate changes.</div>
+</div>
+
+<div class="card wide">
+<h2>Custom Payoff: Pay It Down Faster <span class="info hinfo" title="A what-if for after you own the home: add extra principal each month to see how much sooner it's paid off and how much interest you save. Once you buy, the money you were saving for a down payment is free to go here instead.">i</span></h2>
+<label>Extra Principal Toward the Mortgage Each Month <span class="info" title="This models life after buying, when your down-payment savings are done and can be redirected to killing the mortgage. It doesn't change the 15/30 comparison above.">i</span></label>
+<input id="mortExtra" class="money" type="text" placeholder="$0">
+<input type="range" id="mortExtraSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('mortExtra','mortExtraSlider')">
+<div class="hint" id="mortExtraCap" style="margin-top:2px;margin-bottom:14px;">Models life after buying, so it draws on the money that was going to your down payment.</div>
+<div class="compare" id="customPayoffResult"></div>
+<div class="writeup" id="milestoneWriteup"></div>
+</div>
+
+</div>
+
+<script>
+
+const PRESETS = {
+    single:{expRent:1200,expUtilities:150,expGroceries:400,expGas:200,expInsurance:150,expSubs:50,expPhone:70,expOther:150},
+    married:{expRent:1600,expUtilities:200,expGroceries:700,expGas:300,expInsurance:300,expSubs:70,expPhone:100,expOther:200}
+};
+const STATE_RATES = {
+ AL:{name:"Alabama",rate:4.5},AK:{name:"Alaska",rate:0},AZ:{name:"Arizona",rate:2.5},AR:{name:"Arkansas",rate:4.5},
+ CA:{name:"California",rate:6.0},CO:{name:"Colorado",rate:4.4},CT:{name:"Connecticut",rate:5.0},DE:{name:"Delaware",rate:4.5},
+ DC:{name:"Washington DC",rate:7.0},FL:{name:"Florida",rate:0},GA:{name:"Georgia",rate:5.4},HI:{name:"Hawaii",rate:6.5},
+ ID:{name:"Idaho",rate:5.8},IL:{name:"Illinois",rate:4.95},IN:{name:"Indiana",rate:3.05},IA:{name:"Iowa",rate:4.0},
+ KS:{name:"Kansas",rate:5.0},KY:{name:"Kentucky",rate:4.0},LA:{name:"Louisiana",rate:3.5},ME:{name:"Maine",rate:6.0},
+ MD:{name:"Maryland",rate:4.75},MA:{name:"Massachusetts",rate:5.0},MI:{name:"Michigan",rate:4.25},MN:{name:"Minnesota",rate:6.0},
+ MS:{name:"Mississippi",rate:4.7},MO:{name:"Missouri",rate:4.0},MT:{name:"Montana",rate:5.5},NE:{name:"Nebraska",rate:5.0},
+ NV:{name:"Nevada",rate:0},NH:{name:"New Hampshire",rate:0},NJ:{name:"New Jersey",rate:4.0},NM:{name:"New Mexico",rate:4.0},
+ NY:{name:"New York",rate:5.5},NC:{name:"North Carolina",rate:4.5},ND:{name:"North Dakota",rate:1.5},OH:{name:"Ohio",rate:2.5},
+ OK:{name:"Oklahoma",rate:4.0},OR:{name:"Oregon",rate:8.0},PA:{name:"Pennsylvania",rate:3.07},RI:{name:"Rhode Island",rate:4.5},
+ SC:{name:"South Carolina",rate:5.0},SD:{name:"South Dakota",rate:0},TN:{name:"Tennessee",rate:0},TX:{name:"Texas",rate:0},
+ UT:{name:"Utah",rate:4.65},VT:{name:"Vermont",rate:6.0},VA:{name:"Virginia",rate:5.0},WA:{name:"Washington",rate:0},
+ WV:{name:"West Virginia",rate:4.5},WI:{name:"Wisconsin",rate:5.5},WY:{name:"Wyoming",rate:0}
+};
+
+const MONEY_IDS = ["yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","grossSingle","grossPerson1","grossPerson2","monthlyIncomeOverride","monthlySave","existingSavings","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","lumpBalance","lumpPayment","debtExtra","mortExtra","homePrice"];
+
+const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","grossSingle","grossPerson1","grossPerson2","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct"];
+
+const THRESHOLD = 28;
+const MAX_SEARCH_YEARS = 40;
+const MIN_PAYMENT_PCT = 0.025; // ~2.5% of balance estimate
+
+let debtStrategy="even";
+let debtRows=[];
+let goalRows=[];
+let rowCounter=0;
+let lumpPaymentEdited=false;
+
+function money(n){ return "$"+Math.round(n).toLocaleString("en-US"); }
+function getStartDate(){
+    let v=document.getElementById("startDate").value;
+    if(v){ let d=new Date(v+"T00:00:00"); if(!isNaN(d)) return d; }
+    return new Date();
+}
+function addMonths(date, months){ let d=new Date(date.getTime()); d.setMonth(d.getMonth()+Math.round(months)); return d; }
+function fmtDate(d){ return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+function dateFromMonths(months){
+    if(months===null||months===undefined) return "—";
+    let end=addMonths(getStartDate(),months);
+    return `${fmtDate(end)} · ${fmtMonths(months)} from now`;
+}
+function parseMoney(s){ let v=String(s).replace(/[^0-9.\-]/g,""); let n=Number(v); return isFinite(n)?n:0; }
+function numVal(id){ let el=document.getElementById(id); return el?parseMoney(el.value):0; }
+function formatMoneyField(el){
+    let raw=String(el.value).replace(/[^0-9.]/g,""); let parts=raw.split(".");
+    let intPart=parts[0].replace(/^0+(?=\d)/,""); let dec=parts.length>1?"."+parts.slice(1).join("").slice(0,2):"";
+    if(intPart===""&&dec===""){ el.value=""; return; } if(intPart==="") intPart="0";
+    el.value="$"+Number(intPart).toLocaleString("en-US")+dec;
+}
+function setMoney(id,v){ let el=document.getElementById(id); if(el) el.value="$"+Math.round(v).toLocaleString("en-US"); }
+
+function populateStateSelect(){
+    let sel=document.getElementById("stateSelect");
+    Object.keys(STATE_RATES).sort((a,b)=>STATE_RATES[a].name.localeCompare(STATE_RATES[b].name)).forEach(c=>{
+        let o=document.createElement("option"); o.value=c; o.textContent=STATE_RATES[c].name; sel.appendChild(o);
+    }); sel.value="PA";
+}
+function applyPreset(){ let p=document.getElementById("expensePreset").value; if(p==="custom"){ ["expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther"].forEach(k=>{let el=document.getElementById(k); if(el) el.value="";}); calculateAll(); return; } let v=PRESETS[p]; for(let k in v) setMoney(k,v[k]); calculateAll(); }
+function toggleCollapse(id){ document.getElementById(id).classList.toggle("collapsed"); }
+function toggleDownPayment(){
+    let u=document.getElementById("useSavingsToggle").checked;
+    let d=document.getElementById("downPayment"),m=document.getElementById("downPaymentMode");
+    d.readOnly=u; d.classList.toggle("locked",u); m.disabled=u; m.style.opacity=u?0.5:1;
+    updateDownPlaceholder();
+    calculateAll();
+}
+function onDownModeChange(){
+    // clear the field when switching units so $ and % don't get confused
+    let d=document.getElementById("downPayment");
+    if(!document.getElementById("useSavingsToggle").checked) d.value="";
+    updateDownPlaceholder();
+    calculateAll();
+}
+function toggleCustomTargets(){
+    let on=document.getElementById("customTargets").checked;
+    document.getElementById("customTargetsBlock").style.display=on?"block":"none";
+    calculateAll();
+}
+function getTargetDownPct(){
+    if(document.getElementById("customTargets").checked){ let v=numVal("targetDownPct"); return v>0?v:20; }
+    return 20;
+}
+function getTargetPaymentPct(){
+    if(document.getElementById("customTargets").checked){ let v=numVal("targetPaymentPct"); return v>0?v:28; }
+    return 28;
+}
+function updateDownPlaceholder(){
+    let mode=document.getElementById("downPaymentMode").value;
+    let d=document.getElementById("downPayment");
+    d.placeholder = mode==="percent" ? "e.g. 20" : "$0";
+}
+function toggleDebtMode(){
+    let per=document.getElementById("perDebtMode").checked;
+    document.getElementById("debtLumpBlock").style.display=per?"none":"block";
+    document.getElementById("debtListBlock").style.display=per?"block":"none";
+    document.getElementById("strategyBlock").style.display=per?"block":"none";
+    if(per){
+        if(debtRows.length===0) addDebtRow();
+    } else {
+        // fold individual debts into an averaged lump (keep rows hidden in background)
+        readDebtRows();
+        let active=debtRows.filter(d=>d.balance>0);
+        if(active.length>0){
+            let totalBal=active.reduce((s,d)=>s+d.balance,0);
+            let totalMin=active.reduce((s,d)=>s+(d.minPayment>0?d.minPayment:estimateMinPayment(d.balance)),0);
+            let wAvgRate=active.reduce((s,d)=>s+d.rate*d.balance,0)/totalBal;
+            setMoney("lumpBalance",totalBal);
+            document.getElementById("lumpRate").value=wAvgRate.toFixed(2);
+            setMoney("lumpPayment",totalMin);
+            lumpPaymentEdited=true;
+        }
+    }
+    calculateAll();
+}
+function updateHouseholdVisibility(){
+    let t=document.getElementById("householdType").value, g=document.getElementById("calcFromGross").checked;
+    document.getElementById("singleManualBlock").style.display=(!g&&t!=="couple")?"block":"none";
+    document.getElementById("coupleManualBlock").style.display=(!g&&t==="couple")?"block":"none";
+    document.getElementById("grossIncomeBlock").style.display=g?"block":"none";
+    document.getElementById("grossSingleBlock").style.display=(g&&t!=="couple")?"block":"none";
+    document.getElementById("grossCoupleBlock").style.display=(g&&t==="couple")?"block":"none";
+}
+function onHouseholdTypeChange(){ updateHouseholdVisibility(); let t=document.getElementById("householdType").value; document.getElementById("expensePreset").value=t==="couple"?"married":"single"; applyPreset(); }
+function onIncomeModeChange(){ updateHouseholdVisibility(); calculateAll(); }
+function setDebtStrategy(s){
+    debtStrategy=s;
+    document.getElementById("pillEven").classList.toggle("active",s==="even");
+    document.getElementById("pillHighInterest").classList.toggle("active",s==="interest");
+    document.getElementById("pillSmallBalance").classList.toggle("active",s==="balance");
+    calculateAll();
+}
+// slider drives the paired money input, capped by the slider's max
+function onSlider(inputId, sliderId){
+    let slider=document.getElementById(sliderId), input=document.getElementById(inputId);
+    setMoney(inputId, Number(slider.value));
+    input.classList.remove("over");
+    calculateAll();
+}
+
+// tax
+function calcFederalTax(t,f){
+    let b=f==="married"?[[0,23200,0.10],[23200,94300,0.12],[94300,201050,0.22],[201050,383900,0.24],[383900,487450,0.32],[487450,731200,0.35],[731200,Infinity,0.37]]:[[0,11600,0.10],[11600,47150,0.12],[47150,100525,0.22],[100525,191950,0.24],[191950,243725,0.32],[243725,609350,0.35],[609350,Infinity,0.37]];
+    let x=0; for(let br of b){ if(t>br[0]) x+=(Math.min(t,br[1])-br[0])*br[2]; } return x;
+}
+function calcNetIncome(g,f,sp){ let sd=f==="married"?29200:14600; let tax=Math.max(0,g-sd); let fed=calcFederalTax(tax,f),fica=g*0.0765,st=g*(sp/100); return {net:Math.max(0,g-fed-fica-st),fedTax:fed,fica,stateTax:st,gross:g}; }
+function computeGrossBreakdown(){ let c=document.getElementById("stateSelect").value; let p=STATE_RATES[c]?STATE_RATES[c].rate:0; let hh=document.getElementById("householdType").value; if(hh==="couple") return calcNetIncome(numVal("grossPerson1")+numVal("grossPerson2"),"married",p); return calcNetIncome(numVal("grossSingle"),"single",p); }
+function getYearlyIncome(){ if(document.getElementById("calcFromGross").checked) return computeGrossBreakdown().net; if(document.getElementById("householdType").value==="couple") return numVal("yearlyIncomePerson1")+numVal("yearlyIncomePerson2"); return numVal("yearlyIncomeSingle"); }
+function getMonthlyTakeHome(){ let o=numVal("monthlyIncomeOverride"); return o>0?o:getYearlyIncome()/12; }
+
+// savings
+function baseSavingsAtYear(years){
+    let monthly=numVal("monthlySave"),rate=numVal("hysaRate")/100,existing=numVal("existingSavings");
+    let inHysa=document.getElementById("existingInHysa").checked;
+    let bal=inHysa?existing:0,months=Math.round(years*12);
+    for(let i=0;i<months;i++){ bal=(bal+monthly)*(1+rate/12); }
+    if(!inHysa) bal+=existing;
+    return bal;
+}
+function calcTotalExpenses(){ return ["expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther"].reduce((s,id)=>s+numVal(id),0); }
+
+// ---- debt ----
+function estimateMinPayment(balance){ return balance>0 ? Math.max(25, balance*MIN_PAYMENT_PCT) : 0; }
+
+function getDebtSet(){
+    // returns array of {balance,rate,minPayment} from whichever mode is active
+    if(document.getElementById("perDebtMode").checked){
+        readDebtRows();
+        return debtRows.filter(d=>d.balance>0).map(d=>({balance:d.balance,rate:d.rate,minPayment:d.minPayment>0?d.minPayment:estimateMinPayment(d.balance)}));
+    }
+    let bal=numVal("lumpBalance");
+    if(bal<=0) return [];
+    let rate=numVal("lumpRate");
+    let pay=lumpPaymentEdited?numVal("lumpPayment"):estimateMinPayment(bal);
+    return [{balance:bal,rate:rate,minPayment:pay}];
+}
+
+function simulateDebtPayoff(rows, extra, strategy){
+    let debts=rows.filter(d=>d.balance>0).map(d=>({...d}));
+    if(debts.length===0) return {months:0,empty:true,interest:0};
+    let months=0,totalInterest=0;
+    while(debts.some(d=>d.balance>0)&&months<1200){
+        let pool=extra;
+        for(let d of debts){ if(d.balance>0){ let i=d.balance*(d.rate/100/12); d.balance+=i; totalInterest+=i; } }
+        for(let d of debts){ if(d.balance>0){ let pay=Math.min(d.minPayment,d.balance); d.balance-=pay; } }
+        let active=debts.filter(d=>d.balance>0);
+        if(strategy==="even"){
+            // split the extra pool equally across all active debts
+            let share=active.length>0?pool/active.length:0;
+            for(let d of active){ let pay=Math.min(share,d.balance); d.balance-=pay; pool-=pay; }
+            // any rounding remainder goes to the first with balance
+            for(let d of active){ if(pool<=0) break; if(d.balance>0){ let pay=Math.min(pool,d.balance); d.balance-=pay; pool-=pay; } }
+        } else {
+            active.sort((a,b)=> strategy==="interest"?b.rate-a.rate:a.balance-b.balance);
+            for(let d of active){ if(pool<=0) break; let pay=Math.min(pool,d.balance); d.balance-=pay; pool-=pay; }
+        }
+        months++;
+        if(pool<=0&&extra===0){ let stuck=debts.some(d=>d.balance>0&&d.minPayment<=d.balance*(d.rate/100/12)); if(stuck&&months>2) return {months:null,stuck:true}; }
+    }
+    return months>=1200?{months:null,stuck:true}:{months,empty:false,interest:Math.round(totalInterest)};
+}
+function totalMinPayments(set){ return set.reduce((s,d)=>s+d.minPayment,0); }
+
+// ---- goals ----
+function readGoalRows(){ goalRows.forEach(r=>{ r.amount=parseMoney(document.getElementById(r.id+"_amt").value); r.years=parseMoney(document.getElementById(r.id+"_yrs").value)||1; r.rate=parseMoney(document.getElementById(r.id+"_rate").value); r.name=document.getElementById(r.id+"_name").value; }); }
+function goalMonthly(g){ let m=g.years*12,mr=g.rate/100/12; if(m<=0) return 0; return mr>0?g.amount*mr/(Math.pow(1+mr,m)-1):g.amount/m; }
+function totalGoalMonthly(){ return goalRows.reduce((s,g)=>s+goalMonthly(g),0); }
+
+// ---- mortgage ----
+function calcMonthlyPayment(loan,rate,years){ if(loan<=0) return 0; let m=years*12,mr=rate/100/12; return mr>0?loan*(mr*Math.pow(1+mr,m))/(Math.pow(1+mr,m)-1):loan/m; }
+// PMI: applies when down payment < 20%. Estimate ~0.6%/yr of loan (mid of 0.3%-1.15% range). Drops at 20% equity.
+const PMI_ANNUAL_PCT = 0.6;
+function monthlyPMI(price, down){
+    if(price<=0) return 0;
+    let ltv=(price-down)/price;
+    if(ltv<=0.80) return 0; // 20%+ down, no PMI
+    let loan=price-down;
+    return loan*(PMI_ANNUAL_PCT/100)/12;
+}
+// months of scheduled payments until principal reaches 80% of original price (PMI auto-drops at 78%, requestable at 80%)
+function monthsToDropPMI(price, down, rate, termYears){
+    if(price<=0) return null;
+    if((price-down)/price<=0.80) return 0;
+    let loan=price-down, mr=rate/100/12, pay=calcMonthlyPayment(loan,rate,termYears);
+    let target=price*0.80; // reach 80% LTV = 20% equity
+    let bal=loan, months=0;
+    while(bal>target && months<termYears*12){ bal+=bal*mr; bal-=pay; months++; }
+    return months;
+}
+function payoffMonthsWithExtra(loan,rate,termYears,extra){
+    if(loan<=0) return 0;
+    let basePayment=calcMonthlyPayment(loan,rate,termYears);
+    let mr=rate/100/12, bal=loan, months=0, pay=basePayment+extra;
+    while(bal>0.5 && months<termYears*12+1){
+        bal+=bal*mr; bal-=pay; months++;
+        if(pay<=loan*mr && months>2) return null; // never pays off
+    }
+    return months;
+}
+function fmtMonths(m){ if(m===null) return "—"; let y=Math.floor(m/12),r=m%12; return (y>0?y+"y ":"")+r+"m"; }
+function monthlyTaxMaint(price){ return price*(numVal("taxMaintPercent")/100)/12; }
+function affordabilityPayment(price,down,rate,term,inc){ let loan=Math.max(0,price-down),p=calcMonthlyPayment(loan,rate,term); if(inc) p+=monthlyTaxMaint(price); return p; }
+function getFlag(pct){ if(pct<=28) return {c:"flag-ok",t:"Within the 28% guideline"}; if(pct<=36) return {c:"flag-warn",t:"Above 28%, under 36%, watch it"}; return {c:"flag-bad",t:"Above 36%, stretched"}; }
+function getDownPayment(price,saved){
+    let useSavings=document.getElementById("useSavingsToggle").checked;
+    let mode=document.getElementById("downPaymentMode").value;
+    let down;
+    if(useSavings){
+        down=saved;
+        setMoney("downPayment",saved);
+    } else if(mode==="percent"){
+        down=price*numVal("downPayment")/100;
+    } else {
+        down=numVal("downPayment");
+    }
+    return down;
+}
+function updateDownReadout(price,down,saved,closing){
+    let el=document.getElementById("downReadout");
+    if(price<=0){ el.textContent="Enter a home price to see the numbers."; return; }
+    let pct=price>0?(down/price)*100:0;
+    let cashNeeded=down+closing;
+    let useSavings=document.getElementById("useSavingsToggle").checked;
+    let lines=[];
+    lines.push(`Down payment: <b>${money(down)}</b>, that's <b>${pct.toFixed(1)}%</b> of the ${money(price)} home price.`);
+    lines.push(`Cash needed at closing (down payment + ${money(closing)} closing costs): <b>${money(cashNeeded)}</b>.`);
+    if(!useSavings){
+        let gap=saved-cashNeeded;
+        if(gap>=0) lines.push(`<span style="color:var(--ok);">Your projected savings of ${money(saved)} cover this, with ${money(gap)} to spare.</span>`);
+        else lines.push(`<span style="color:var(--bad);">You'd have ${money(saved)} saved, short by ${money(-gap)}.</span>`);
+    } else {
+        lines.push(`This is auto-filled from your projected savings of ${money(saved)}.`);
+    }
+    el.innerHTML=lines.join("<br>");
+}
+function buildPlanHTML(label,price,down,rate,years,checkIncome,closing,inc){
+    let loan=Math.max(0,price-down),payment=affordabilityPayment(price,down,rate,years,inc);
+    let pct=checkIncome>0?(payment/checkIncome)*100:0,f=getFlag(pct);
+    let pi=calcMonthlyPayment(loan,rate,years),interest=pi*years*12-loan;
+    return `<div class="plan"><h3>${label}</h3><div class="big">${money(payment)}/mo</div>
+        <div class="summary-line"><span>Loan Amount</span><span>${money(loan)}</span></div>
+        <div class="summary-line"><span>Total Interest</span><span>${money(interest)}</span></div>
+        <div class="summary-line"><span>Cash at Closing</span><span>${money(down+closing)}</span></div>
+        <div class="summary-line"><span>% of Take-Home</span><span class="${f.c}">${pct.toFixed(1)}%</span></div>
+        <div style="margin-top:10px;text-align:center;" class="${f.c}">${f.t}${inc?" · incl. tax+maint":""}</div></div>`;
+}
+
+// ---- optimal engine (now debt-aware) ----
+function rentPaidOverYears(years){ let rent=numVal("currentRent"),inc=numVal("rentIncrease")/100,t=0,y=rent*12; for(let i=0;i<years;i++){ t+=y; y*=(1+inc); } return t; }
+
+// project savings at year Y accounting for: debt payoff first (default), then freed payment added to savings
+function savingsWithDebtPlan(years, debtFreeYears, freedMonthly){
+    let monthly=numVal("monthlySave"),rate=numVal("hysaRate")/100,existing=numVal("existingSavings");
+    let inHysa=document.getElementById("existingInHysa").checked;
+    let bal=inHysa?existing:0, months=Math.round(years*12), debtFreeMonth=Math.round(debtFreeYears*12);
+    for(let i=0;i<months;i++){
+        let contrib=monthly;
+        if(i>=debtFreeMonth) contrib+=freedMonthly; // freed-up debt payment rolls in after payoff
+        bal=(bal+contrib)*(1+rate/12);
+    }
+    if(!inHysa) bal+=existing;
+    return bal;
+}
+
+function findOptimalYear(price,rate,term,takeHome,inc,opts){
+    // opts: { debtFreeYears, freedMonthly, debtMonthlyDuringWait, carryDebt, targetDownPct, targetPaymentPct }
+    let targetDownPct=opts.targetDownPct||20;
+    let targetPct=opts.targetPaymentPct||THRESHOLD;
+    let requiredDown=price*targetDownPct/100;
+    for(let y=0;y<=MAX_SEARCH_YEARS;y++){
+        let down;
+        if(opts.carryDebt){
+            down=baseSavingsAtYear(y);
+        } else {
+            if(y < opts.debtFreeYears) continue; // can't buy before debt-free
+            down=savingsWithDebtPlan(y, opts.debtFreeYears, opts.freedMonthly);
+        }
+        if(down>=price) return {year:y,down,paidOff:true};
+        // must have saved the target down payment first
+        if(down < requiredDown) continue;
+        let payment=affordabilityPayment(price,down,rate,term,inc);
+        // add PMI if under 20% down
+        let pmi=monthlyPMI(price,down);
+        payment+=pmi;
+        // if carrying debt, the check must cover mortgage + debt payment
+        let effective=payment + (opts.carryDebt?opts.debtMonthlyDuringWait:0);
+        let pct=takeHome>0?(effective/takeHome)*100:Infinity;
+        if(pct<=targetPct) return {year:y,down,payment,percent:pct,paidOff:false,effective,pmi};
+    }
+    return null;
+}
+
+// like findOptimalYear but with an overridden monthly savings amount (for the "apply all leftover" scenario)
+function findOptimalYearWithSave(price,rate,term,takeHome,inc,opts,overrideMonthlySave){
+    let targetDownPct=opts.targetDownPct||20;
+    let targetPct=opts.targetPaymentPct||THRESHOLD;
+    let requiredDown=price*targetDownPct/100;
+    let hysaRate=numVal("hysaRate")/100, existing=numVal("existingSavings");
+    let inHysa=document.getElementById("existingInHysa").checked;
+    function balAt(years){
+        let bal=inHysa?existing:0, months=Math.round(years*12), dfm=Math.round((opts.debtFreeYears||0)*12);
+        for(let i=0;i<months;i++){ let c=overrideMonthlySave; if(!opts.carryDebt && i>=dfm) c+=(opts.freedMonthly||0); bal=(bal+c)*(1+hysaRate/12); }
+        if(!inHysa) bal+=existing;
+        return bal;
+    }
+    for(let y=0;y<=MAX_SEARCH_YEARS;y++){
+        if(!opts.carryDebt && y<(opts.debtFreeYears||0)) continue;
+        let down=balAt(y);
+        if(down>=price) return {year:y,down,paidOff:true};
+        if(down<requiredDown) continue;
+        let payment=affordabilityPayment(price,down,rate,term,inc)+monthlyPMI(price,down);
+        let effective=payment+(opts.carryDebt?opts.debtMonthlyDuringWait:0);
+        let pct=takeHome>0?(effective/takeHome)*100:Infinity;
+        if(pct<=targetPct) return {year:y,down,payment,percent:pct,paidOff:false};
+    }
+    return null;
+}
+
+function buildOptimalColumn(label,term,price,rate,takeHome,inc,opts){
+    let r=findOptimalYear(price,rate,term,takeHome,inc,opts);
+    let tgtPct=opts.targetPaymentPct||THRESHOLD;
+    if(!r) return `<div class="plan"><h3>${label}</h3><div class="big flag-bad">—</div><div style="text-align:center;font-size:13px;color:#ff8f88;">Even after ${MAX_SEARCH_YEARS} years you can't reach the targets. Try a lower price, more savings, or a longer term.</div></div>`;
+    if(r.paidOff) return `<div class="plan"><h3>${label}</h3><div class="big flag-ok">Pay cash</div><div class="summary-line"><span>Savings reach price in</span><span>${r.year} yr</span></div><div style="text-align:center;margin-top:8px;font-size:13px;" class="flag-ok">Enough to buy outright, no mortgage needed.</div></div>`;
+    let headline=r.year===0?"Buy now":`Rent ${r.year} yr${r.year>1?"s":""}`;
+    return `<div class="plan"><h3>${label}</h3><div class="big flag-ok">${headline}</div>
+        <div class="summary-line"><span>Buy around</span><span>${r.year===0?"now":fmtDate(addMonths(getStartDate(),Math.round(r.year*12)))}</span></div>
+        <div class="summary-line"><span>Down payment then</span><span>${money(r.down)}</span></div>
+        <div class="summary-line"><span>Mortgage payment</span><span>${money(r.payment)}/mo</span></div>
+        <div class="summary-line"><span>% of take-home</span><span class="flag-ok">${r.percent.toFixed(1)}%</span></div>
+        ${r.year>0?`<div class="summary-line"><span>Rent paid while waiting</span><span>${money(rentPaidOverYears(r.year))}</span></div>`:""}</div>`;
+}
+
+// ---- dynamic rows ----
+function addDebtRow(data){
+    let id="debt"+(rowCounter++); let d=data||{name:"",balance:0,rate:0,minPayment:0};
+    debtRows.push({id,...d});
+    let div=document.createElement("div"); div.className="list-row"; div.id=id;
+    div.innerHTML=`
+        <div class="lf" style="flex:1.2"><input id="${id}_name" type="text" placeholder="e.g. Visa"><div class="cap">Name</div></div>
+        <div class="lf"><input id="${id}_bal" class="rowmoney" type="text" placeholder="$0" value="${d.balance?money(d.balance):''}"><div class="cap">Balance</div></div>
+        <div class="lf" style="flex:0.7"><input id="${id}_rate" type="number" placeholder="0" value="${d.rate||''}"><div class="cap">Rate %</div></div>
+        <div class="lf"><input id="${id}_min" class="rowmoney" type="text" placeholder="~$0" value="${d.minPayment?money(d.minPayment):''}"><div class="cap">Min Payment</div></div>
+        <button class="remove-x" onclick="removeRow('debtRows','${id}')">×</button>`;
+    document.getElementById("debtList").appendChild(div);
+    div.querySelectorAll(".rowmoney").forEach(el=>el.addEventListener("input",()=>formatMoneyField(el)));
+    div.querySelectorAll("input").forEach(i=>i.addEventListener("input",calculateAll));
+    calculateAll();
+}
+function addGoalRow(data){
+    let id="goal"+(rowCounter++); let g=data||{name:"",amount:0,years:5,rate:5};
+    goalRows.push({id,...g});
+    let div=document.createElement("div"); div.className="list-row"; div.id=id;
+    div.innerHTML=`
+        <div class="lf" style="flex:1.2"><input id="${id}_name" type="text" placeholder="e.g. Car"><div class="cap">Goal</div></div>
+        <div class="lf"><input id="${id}_amt" class="rowmoney" type="text" placeholder="$0" value="${g.amount?money(g.amount):''}"><div class="cap">Target</div></div>
+        <div class="lf" style="flex:0.6"><input id="${id}_yrs" type="number" placeholder="5" value="${g.years||''}"><div class="cap">Years</div></div>
+        <div class="lf" style="flex:0.6"><input id="${id}_rate" type="number" placeholder="5" value="${g.rate||''}"><div class="cap">Return %</div></div>
+        <button class="remove-x" onclick="removeRow('goalRows','${id}')">×</button>`;
+    document.getElementById("goalList").appendChild(div);
+    div.querySelectorAll(".rowmoney").forEach(el=>el.addEventListener("input",()=>formatMoneyField(el)));
+    div.querySelectorAll("input").forEach(i=>i.addEventListener("input",calculateAll));
+    calculateAll();
+}
+function readDebtRows(){ debtRows.forEach(r=>{ r.balance=parseMoney(document.getElementById(r.id+"_bal").value); r.rate=parseMoney(document.getElementById(r.id+"_rate").value); r.minPayment=parseMoney(document.getElementById(r.id+"_min").value); r.name=document.getElementById(r.id+"_name").value; }); }
+function removeRow(listName,id){ let list=listName==="debtRows"?debtRows:goalRows; let i=list.findIndex(r=>r.id===id); if(i>=0) list.splice(i,1); let el=document.getElementById(id); if(el) el.remove(); calculateAll(); }
+
+// ---- main ----
+function calculateAll(){
+    let takeHome=getMonthlyTakeHome();
+    let calcGross=document.getElementById("calcFromGross").checked;
+    let hh=document.getElementById("householdType").value;
+
+    document.getElementById("incomeTotalLine").textContent=(calcGross||hh==="couple")?"Combined take-home: "+money(getYearlyIncome())+"/yr":"";
+    let taxEl=document.getElementById("taxBreakdown");
+    if(calcGross){ let b=computeGrossBreakdown(); taxEl.textContent="Est. Federal "+money(b.fedTax)+" · FICA "+money(b.fica)+" · State "+money(b.stateTax); } else taxEl.textContent="";
+    document.getElementById("monthlyIncomeResult").textContent=money(takeHome);
+    // gross vs net comparison line
+    let gnEl=document.getElementById("grossNetCompare");
+    if(calcGross){
+        let b=computeGrossBreakdown();
+        let grossMonthly=b.gross/12;
+        gnEl.innerHTML=`before tax: ${money(grossMonthly)}/mo · after tax: ${money(takeHome)}/mo · tax takes ${money(grossMonthly-takeHome)}/mo`;
+    } else {
+        gnEl.textContent="";
+    }
+
+    let expenses=calcTotalExpenses();
+    document.getElementById("expenseResult").textContent=money(expenses);
+    // mirror rent/housing expense into the optimal plan's current rent
+    setMoney("currentRent", numVal("expRent"));
+    let expPct=takeHome>0?(expenses/takeHome)*100:0;
+    let expPctEl=document.getElementById("expensePctSub");
+    expPctEl.textContent=`${expPct.toFixed(1)}% of take-home`;
+    expPctEl.className="rb-sub num "+(expPct>100?"flag-bad":"");
+    let rentPctEl=document.getElementById("rentPct");
+    let rentAmt=numVal("expRent");
+    rentPctEl.textContent = (takeHome>0 && rentAmt>0) ? `${((rentAmt/takeHome)*100).toFixed(1)}% of take-home` : "";
+
+    let saveYears=numVal("saveYears")||0;
+    let projected=baseSavingsAtYear(saveYears);
+    document.getElementById("downPaymentLump").textContent=money(projected);
+    document.getElementById("downPaymentLumpLabel").textContent=`saved for down payment in ${saveYears} yr${saveYears!=1?"s":""}`;
+    let monthlySave=numVal("monthlySave");
+    let savePct=takeHome>0?(monthlySave/takeHome)*100:0;
+    document.getElementById("savePercentSub").textContent=`${money(monthlySave)}/mo · ${savePct.toFixed(1)}% of take-home`;
+    // lump payment hint (estimated min shown greyed until edited)
+    let lumpBal=numVal("lumpBalance");
+    let lumpPayEl=document.getElementById("lumpPayment");
+    let lumpHint=document.getElementById("lumpPayHint");
+    if(!document.getElementById("perDebtMode").checked){
+        if(!lumpPaymentEdited && lumpBal>0){
+            let est=estimateMinPayment(lumpBal);
+            lumpPayEl.value="~"+money(est);
+            lumpPayEl.classList.add("estimated");
+            lumpHint.textContent="(estimated, click to change)";
+        } else if(!lumpPaymentEdited){
+            lumpPayEl.value=""; lumpPayEl.classList.remove("estimated"); lumpHint.textContent="";
+        } else {
+            lumpPayEl.classList.remove("estimated"); lumpHint.textContent="";
+        }
+    }
+
+    // debt engine
+    let debtSet=getDebtSet();
+    let extra=numVal("debtExtra");
+    let anyDebt=debtSet.length>0;
+    let baseMin=totalMinPayments(debtSet);
+    let debtMonthly = anyDebt ? baseMin+extra : 0;
+
+    let dRes=document.getElementById("debtPayoffResult"),dLab=document.getElementById("debtPayoffLabel"),dNote=document.getElementById("debtExtraNote");
+    let debtFreeYears=0, freedMonthly=debtMonthly;
+    if(!anyDebt){
+        dRes.textContent="No debt entered"; dRes.className="rb-big"; dLab.textContent=""; dNote.textContent=""; debtFreeYears=0; freedMonthly=0;
+    } else {
+        let sim=simulateDebtPayoff(debtSet, extra, debtStrategy);
+        if(sim.stuck||sim.months===null){
+            dRes.textContent="Payment too low"; dRes.className="rb-big flag-bad"; dLab.textContent="raise the payment or add extra"; dNote.textContent="";
+            debtFreeYears=MAX_SEARCH_YEARS+1; // effectively never
+        } else {
+            let yrs=Math.floor(sim.months/12),rem=sim.months%12;
+            dRes.textContent=(yrs>0?yrs+"y ":"")+rem+"m"; dRes.className="rb-big flag-ok"; dLab.textContent="until debt-free";
+            let stratName={even:"Even · ",interest:"Avalanche · ",balance:"Snowball · "};
+            let stratNote = document.getElementById("perDebtMode").checked ? (stratName[debtStrategy]||"") : "";
+            dNote.textContent=`${stratNote}Paying ${money(debtMonthly)}/mo · ${money(sim.interest)} total interest`;
+            debtFreeYears=sim.months/12;
+        }
+    }
+
+    // goals
+    readGoalRows();
+    let goalTotal=totalGoalMonthly();
+    document.getElementById("goalTotalResult").textContent=money(goalTotal);
+
+    let mortExtra=numVal("mortExtra");
+    let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal-mortExtra;
+    document.getElementById("incomeStat").textContent=money(takeHome);
+    document.getElementById("expenseStat").textContent=money(expenses);
+    document.getElementById("saveStat").textContent=money(monthlySave);
+    document.getElementById("debtStat").textContent=money(debtMonthly);
+    document.getElementById("goalStat").textContent=money(goalTotal);
+    let lo=document.getElementById("leftoverStat"); lo.textContent=money(leftover); lo.className="big num "+(leftover<0?"flag-bad":"flag-ok");
+    let pctOf=(x)=> takeHome>0 ? ((x/takeHome)*100).toFixed(1)+"%" : "—";
+    document.getElementById("expenseStatPct").textContent=pctOf(expenses);
+    document.getElementById("saveStatPct").textContent=pctOf(monthlySave);
+    document.getElementById("debtStatPct").textContent=pctOf(debtMonthly);
+    document.getElementById("goalStatPct").textContent=pctOf(goalTotal);
+    let loPctEl=document.getElementById("leftoverStatPct");
+    loPctEl.textContent=pctOf(leftover);
+    loPctEl.className="subpct "+(leftover<0?"flag-bad":"");
+
+    // leftover breakdown (i): only show categories that have a value
+    let incLabel = document.getElementById("calcFromGross").checked ? "take-home (after tax)" : "take-home";
+    let bd=[`${money(takeHome)} ${incLabel}`];
+    if(expenses>0) bd.push(`− ${money(expenses)} expenses`);
+    if(monthlySave>0) bd.push(`− ${money(monthlySave)} house savings`);
+    if(debtMonthly>0) bd.push(`− ${money(debtMonthly)} debt payment`);
+    if(goalTotal>0) bd.push(`− ${money(goalTotal)} goals`);
+    if(mortExtra>0) bd.push(`− ${money(mortExtra)} extra to mortgage`);
+    bd.push(`= ${money(leftover)} left over`);
+    let breakdownText=bd.join("  ");
+    let noteEl=document.getElementById("overviewNote");
+    noteEl.innerHTML = (leftover<0
+        ? `<span class="flag-bad">You're over budget by ${money(-leftover)}. Trim expenses or lower a target.</span>`
+        : `Left over is money not yet assigned. Slide it into savings, debt, or extra mortgage payments to put it to work.`)
+        + ` <span class="info" title="${breakdownText}">i</span>`;
+
+    // ---- waterfall: cap sliders by what's available above them ----
+    let pool=Math.max(0, takeHome - expenses - goalTotal - (anyDebt?baseMin:0));
+    let saveCap=pool;
+    let debtExtraCap=Math.max(0, pool - monthlySave);
+    // mortgage extra is a post-purchase what-if: once you own, house-savings stops and frees up,
+    // so cap it by what you'd have after buying (pool minus debt extra, savings no longer needed)
+    let mortExtraCap=Math.max(0, pool - extra);
+    function applyCap(inputId, sliderId, capId, value, cap, label){
+        let slider=document.getElementById(sliderId), input=document.getElementById(inputId), capEl=document.getElementById(capId);
+        slider.max=Math.max(10, Math.round(cap));
+        slider.value=Math.min(value, cap);
+        input.classList.toggle("over", value>cap+0.5);
+        if(capEl) capEl.innerHTML = value>cap+0.5
+            ? `<span style="color:var(--bad);">Over your available ${money(cap)} by ${money(value-cap)}.</span>`
+            : `${label}. Up to ${money(cap)} available.`;
+    }
+    applyCap("monthlySave","monthlySaveSlider","monthlySaveCap",monthlySave,saveCap,"Drag to set house savings");
+    applyCap("debtExtra","debtExtraSlider","debtExtraCap",extra,debtExtraCap,"Extra kills debt faster");
+    applyCap("mortExtra","mortExtraSlider","mortExtraCap",mortExtra,mortExtraCap,"Extra principal pays the house off sooner");
+
+    // mortgage
+    let price=numVal("homePrice"),rate=numVal("mortgageRate");
+    let down=getDownPayment(price,projected);
+    let closing=price*numVal("closingCostPercent")/100;
+    updateDownReadout(price,down,projected,closing);
+    // PMI detail
+    let pmiMonthly=monthlyPMI(price,down);
+    let pmiBox=document.getElementById("pmiBox");
+    let showPmi=document.getElementById("showPmi").checked;
+    if(showPmi){
+        pmiBox.style.display="block";
+        if(price<=0){ document.getElementById("pmiReadout").textContent="Enter a home price to see PMI detail."; }
+        else if(pmiMonthly<=0){ document.getElementById("pmiReadout").innerHTML=`<span style="color:var(--ok);">You're putting down 20% or more, so no PMI. That's the cleanest path.</span>`; }
+        else {
+            let dropMonths=monthsToDropPMI(price,down,rate,30);
+            let dpct=(down/price)*100;
+            document.getElementById("pmiReadout").innerHTML=`At ${dpct.toFixed(1)}% down you'd pay PMI of about <b>${money(pmiMonthly)}/month</b> (est. ${PMI_ANNUAL_PCT}% of the loan per year). On a 30-year loan you'd reach 20% equity and could drop it in about <b>${dateFromMonths(dropMonths)}</b>, roughly <b>${money(pmiMonthly*dropMonths)}</b> in PMI total. Putting 20% down avoids it entirely.`;
+        }
+    } else {
+        pmiBox.style.display="none";
+    }
+    let inc=document.getElementById("includeTaxMaint").checked;
+    document.getElementById("compareResult").innerHTML=buildPlanHTML("30 Year",price,down,rate,30,takeHome,closing,inc)+buildPlanHTML("15 Year",price,down,rate,15,takeHome,closing,inc);
+
+    // optimal (debt-aware)
+    let carryDebt=!document.getElementById("debtFreeFirst").checked;
+    let opts={ debtFreeYears:anyDebt?debtFreeYears:0, freedMonthly:anyDebt?freedMonthly:0, debtMonthlyDuringWait:anyDebt?debtMonthly:0, carryDebt, targetDownPct:getTargetDownPct(), targetPaymentPct:getTargetPaymentPct() };
+    document.getElementById("optimalResult").innerHTML=buildOptimalColumn("30 Year",30,price,rate,takeHome,inc,opts)+buildOptimalColumn("15 Year",15,price,rate,takeHome,inc,opts);
+
+    let r30=findOptimalYear(price,rate,30,takeHome,inc,opts);
+    let v=document.getElementById("optimalVerdict");
+    let w=document.getElementById("optimalWriteup");
+    let tgtDownPct=getTargetDownPct();
+    let tgtPayPct=getTargetPaymentPct();
+
+    if(price<=0){
+        v.textContent=""; v.className="verdict";
+        w.textContent="Enter a home price in the mortgage section above, and this will tell you the soonest you can responsibly buy.";
+    } else if(!r30){
+        v.textContent="Out of reach at current numbers."; v.className="verdict flag-bad";
+        w.innerHTML=`With today's price, rate, and savings, you can't reach ${tgtDownPct}% down with a payment at or under ${tgtPayPct}% of take-home, even after decades. Lowering the price, saving more each month, a longer loan term, or loosening the targets under Custom would bring it within reach.`;
+    } else {
+        let rentAmt=numVal("currentRent");
+        let buyMonths=Math.round(r30.year*12);
+        let parts=[];
+
+        if(r30.year===0||r30.paidOff){
+            v.textContent="You can responsibly buy now."; v.className="verdict flag-ok";
+        } else {
+            v.innerHTML=`Soonest you can responsibly buy: <span style="color:var(--ink);">${dateFromMonths(buyMonths)}</span>`;
+            v.className="verdict";
+        }
+
+        parts.push(`<b>Your targets:</b> at least <b>${tgtDownPct}% down</b>${tgtDownPct>=20?" (avoids PMI)":" (adds PMI until you reach 20% equity)"} and a payment at or under <b>${tgtPayPct}%</b> of take-home.`);
+
+        if(anyDebt && !carryDebt && debtFreeYears>0 && debtFreeYears<=MAX_SEARCH_YEARS){
+            let dMonths=Math.round(debtFreeYears*12);
+            parts.push(`<b>Step 1, clear your debt.</b> Paying ${money(debtMonthly)}/month, you'd be debt-free around <b>${dateFromMonths(dMonths)}</b>. After that, that ${money(debtMonthly)} rolls straight into your house savings, so the down payment grows faster.`);
+        } else if(anyDebt && carryDebt){
+            parts.push(`<b>You've chosen to buy while still carrying debt.</b> That's allowed, but the affordability check below counts your mortgage <i>and</i> your ${money(debtMonthly)}/month debt payment, so it takes a bigger down payment to qualify.`);
+        }
+
+        if(r30.year===0||r30.paidOff){
+            parts.push(`<b>You're already in range.</b> Buying now keeps your 30-year payment at or below ${tgtPayPct}% of take-home.`);
+        } else {
+            let pmiNote = r30.pmi>0 ? ` That includes about ${money(r30.pmi)}/month of PMI, since you're under 20% down.` : "";
+            parts.push(`<b>Step ${anyDebt&&!carryDebt?"2":"1"}, save the down payment.</b> Keep renting while your down payment grows to about <b>${money(r30.down)}</b> (${tgtDownPct}% of the price). You'd hit the buy point around <b>${dateFromMonths(buyMonths)}</b>, when a 30-year mortgage lands at ${money(r30.payment)}/month, <b>${r30.percent.toFixed(1)}%</b> of take-home.${pmiNote}`);
+            let totalRent=rentPaidOverYears(r30.year);
+            parts.push(`<b>The cost of waiting:</b> over those ${r30.year} year${r30.year>1?"s":""} you'd pay about <b>${money(totalRent)}</b> in rent at ${money(rentAmt)}/month. That's money spent, not saved. If rent is eating your budget, that's what's pushing the buy date out.`);
+        }
+
+        // apply-all-leftover scenario
+        if(leftover>0.5 && !(r30.year===0||r30.paidOff)){
+            let optsFast={ ...opts };
+            // simulate adding leftover to monthly savings by temporarily bumping the saved balance projection
+            let origSave=numVal("monthlySave");
+            let rFast=findOptimalYearWithSave(price,rate,30,takeHome,inc,opts,origSave+leftover);
+            if(rFast && rFast.year<r30.year){
+                let diff=r30.year-rFast.year;
+                parts.push(`<b>You have ${money(leftover)}/month sitting unused.</b> If you slid all of it into house savings, you'd hit the buy point about <b>${diff} year${diff>1?"s":""} sooner</b>, around ${dateFromMonths(Math.round(rFast.year*12))}. Drag the Down Payment Savings slider up to put it to work.`);
+            }
+        }
+
+        if(anyDebt && !carryDebt){
+            let optsCarry={ debtFreeYears, freedMonthly, debtMonthlyDuringWait:debtMonthly, carryDebt:true, targetDownPct:getTargetDownPct(), targetPaymentPct:getTargetPaymentPct() };
+            let rCarry=findOptimalYear(price,rate,30,takeHome,inc,optsCarry);
+            if(rCarry && rCarry.year<r30.year){
+                let diff=r30.year-rCarry.year;
+                parts.push(`If you were willing to carry debt into the mortgage, you could buy about <b>${diff} year${diff>1?"s":""} sooner</b> (around ${dateFromMonths(Math.round(rCarry.year*12))}), but you'd be juggling both payments. Uncheck "Be debt-free before buying" above to model that.`);
+            }
+        }
+
+        w.innerHTML=parts.join("<br><br>");
+    }
+
+    // ---- custom payoff card (extra principal what-if) ----
+    let loanAmt=Math.max(0, price-down);
+    function payoffCol(label, term){
+        let baseMonths=payoffMonthsWithExtra(loanAmt,rate,term,0);
+        let fastMonths=payoffMonthsWithExtra(loanAmt,rate,term,mortExtra);
+        let basePay=calcMonthlyPayment(loanAmt,rate,term);
+        let baseInterest=basePay*term*12-loanAmt;
+        let fastInterest=fastMonths!==null?((basePay+mortExtra)*fastMonths-loanAmt):0;
+        let saved=baseInterest-fastInterest;
+        return `<div class="plan"><h3>${label} + Extra</h3>
+            <div class="big">${fmtMonths(fastMonths)}</div>
+            <div class="summary-line"><span>Normal payoff</span><span>${fmtMonths(baseMonths)}</span></div>
+            <div class="summary-line"><span>Monthly payment</span><span>${money(basePay+mortExtra)}</span></div>
+            <div class="summary-line"><span>Interest saved</span><span class="flag-ok">${mortExtra>0?money(Math.max(0,saved)):"$0"}</span></div></div>`;
+    }
+    if(loanAmt>0){
+        document.getElementById("customPayoffResult").innerHTML=payoffCol("30 Year",30)+payoffCol("15 Year",15);
+    } else {
+        document.getElementById("customPayoffResult").innerHTML=`<div class="plan"><h3>—</h3><div style="text-align:center;font-size:13px;color:rgba(255,255,255,0.7);">Enter a home price and down payment above to model an accelerated payoff.</div></div>`;
+    }
+    // milestone timeline
+    let mile=[];
+    if(anyDebt && debtFreeYears<=MAX_SEARCH_YEARS){ mile.push(`Debt-free: ${dateFromMonths(Math.round(debtFreeYears*12))}`); }
+    goalRows.filter(g=>g.amount>0).forEach(g=>{ mile.push(`${g.name||"Goal"} funded: ${dateFromMonths(Math.round(g.years*12))}`); });
+    if(loanAmt>0){ let fm=payoffMonthsWithExtra(loanAmt,rate,30,mortExtra); mile.push(`House paid off: ${dateFromMonths(fm)}${mortExtra>0?` (with ${money(mortExtra)}/mo extra)`:" on a 30-year loan"}`); }
+    document.getElementById("milestoneWriteup").innerHTML = mile.length ? "<b>Your milestones</b><br>" + mile.join("<br>") : "Add debt, goals, or a home price to see your milestone timeline.";
+
+    saveToLocalStorage();
+}
+
+// ---- persistence ----
+const STORAGE_KEY="budgetDashboardData_v5";
+function collectData(){
+    let data={};
+    FLAT_FIELD_IDS.forEach(id=>{ let el=document.getElementById(id); if(el) data[id]=el.type==="checkbox"?el.checked:el.value; });
+    readDebtRows(); readGoalRows();
+    data.__debtRows=debtRows.map(r=>({name:r.name,balance:r.balance,rate:r.rate,minPayment:r.minPayment}));
+    data.__goalRows=goalRows.map(r=>({name:r.name,amount:r.amount,years:r.years,rate:r.rate}));
+    data.__debtStrategy=debtStrategy;
+    data.__lumpPaymentEdited=lumpPaymentEdited;
+    data.__collapsed={debtCard:document.getElementById("debtCard").classList.contains("collapsed"),goalCard:document.getElementById("goalCard").classList.contains("collapsed")};
+    return data;
+}
+function applyData(data){
+    FLAT_FIELD_IDS.forEach(id=>{ if(!(id in data)) return; let el=document.getElementById(id); if(!el) return; if(el.type==="checkbox") el.checked=data[id]; else el.value=data[id]; });
+    lumpPaymentEdited=!!data.__lumpPaymentEdited;
+    MONEY_IDS.forEach(id=>{ let el=document.getElementById(id); if(el&&el.value!==""&&id!=="lumpPayment") formatMoneyField(el); });
+    debtRows=[]; goalRows=[];
+    document.getElementById("debtList").innerHTML=""; document.getElementById("goalList").innerHTML="";
+    if(data.__debtRows) data.__debtRows.forEach(r=>addDebtRow(r));
+    if(data.__goalRows) data.__goalRows.forEach(r=>addGoalRow(r));
+    if(data.__debtStrategy) setDebtStrategy(data.__debtStrategy);
+    if(data.__collapsed){ document.getElementById("debtCard").classList.toggle("collapsed",data.__collapsed.debtCard); document.getElementById("goalCard").classList.toggle("collapsed",data.__collapsed.goalCard); }
+    updateHouseholdVisibility(); toggleDownPayment(); toggleDebtMode(); toggleCustomTargets(); calculateAll();
+}
+function saveToLocalStorage(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(collectData())); }catch(e){} }
+function loadFromLocalStorage(){ try{ let r=localStorage.getItem(STORAGE_KEY); if(r){ applyData(JSON.parse(r)); return true; } }catch(e){} return false; }
+
+function clearAll(){
+    if(!confirm("Clear all inputs and reset to blank? This can't be undone.")) return;
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    FLAT_FIELD_IDS.forEach(id=>{ let el=document.getElementById(id); if(!el) return;
+        if(el.type==="checkbox"){ el.checked=(id==="existingInHysa"||id==="useSavingsToggle"||id==="debtFreeFirst"); }
+        else if(el.tagName==="SELECT"){ if(id==="householdType") el.value="single"; else if(id==="expensePreset") el.value="custom"; else if(id==="downPaymentMode") el.value="dollar"; else if(id==="stateSelect") el.value="PA"; }
+        else if(id==="startDate"){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+        else el.value="";
+    });
+    debtRows=[]; goalRows=[]; document.getElementById("debtList").innerHTML=""; document.getElementById("goalList").innerHTML="";
+    lumpPaymentEdited=false;
+    document.getElementById("debtCard").classList.add("collapsed");
+    document.getElementById("goalCard").classList.add("collapsed");
+    updateHouseholdVisibility(); toggleDownPayment(); toggleDebtMode(); setDebtStrategy("even");
+    showMsg("Cleared. Everything reset to blank.");
+    calculateAll();
+}
+
+// ---- file save/load ----
+let savedFileHandle=null;
+function showMsg(t){ let el=document.getElementById("saveMsg"); el.textContent=t; setTimeout(()=>{ if(el.textContent===t) el.textContent=""; },4000); }
+async function saveAsFile(){ let j=JSON.stringify(collectData(),null,2); if("showSaveFilePicker" in window){ try{ savedFileHandle=await window.showSaveFilePicker({suggestedName:"budget-dashboard-data.json",types:[{description:"JSON File",accept:{"application/json":[".json"]}}]}); let w=await savedFileHandle.createWritable(); await w.write(j); await w.close(); showMsg("Saved to file."); }catch(e){ if(e.name!=="AbortError") showMsg("Save failed: "+e.message); } } else { let b=new Blob([j],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a"); a.href=u; a.download="budget-dashboard-data.json"; a.click(); URL.revokeObjectURL(u); showMsg("Downloaded."); } }
+async function saveOverwrite(){ if(!savedFileHandle) return saveAsFile(); try{ let w=await savedFileHandle.createWritable(); await w.write(JSON.stringify(collectData(),null,2)); await w.close(); showMsg("Overwrote saved file."); }catch(e){ showMsg("Overwrite failed: "+e.message); } }
+async function loadFromFile(){ if("showOpenFilePicker" in window){ try{ let [h]=await window.showOpenFilePicker({types:[{description:"JSON File",accept:{"application/json":[".json"]}}]}); savedFileHandle=h; let f=await h.getFile(); applyData(JSON.parse(await f.text())); showMsg("Loaded file."); }catch(e){ if(e.name!=="AbortError") showMsg("Load failed: "+e.message); } } else document.getElementById("fallbackFileInput").click(); }
+document.getElementById("fallbackFileInput").addEventListener("change",function(e){ let f=e.target.files[0]; if(!f) return; let r=new FileReader(); r.onload=ev=>{ applyData(JSON.parse(ev.target.result)); showMsg("Loaded file."); }; r.readAsText(f); });
+
+// ---- live formatting + updates ----
+MONEY_IDS.forEach(id=>{ if(id==="lumpPayment") return; let el=document.getElementById(id); if(el) el.addEventListener("input",()=>formatMoneyField(el)); });
+// lump payment: mark as edited when user types
+document.getElementById("lumpPayment").addEventListener("focus",function(){ if(this.classList.contains("estimated")){ this.value=""; this.classList.remove("estimated"); } });
+document.getElementById("lumpPayment").addEventListener("input",function(){ lumpPaymentEdited=this.value.replace(/[^0-9.]/g,"")!==""; formatMoneyField(this); });
+document.getElementById("downPayment").addEventListener("input",function(){ if(document.getElementById("downPaymentMode").value==="dollar") formatMoneyField(this); });
+document.querySelectorAll('.dashboard input, .dashboard select').forEach(el=>{ el.addEventListener('input',calculateAll); el.addEventListener('change',calculateAll); });
+
+// ---- init ----
+populateStateSelect();
+setDebtStrategy("even");
+// default the plan start date to today
+(function(){ let el=document.getElementById("startDate"); if(el && !el.value){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); } })();
+let loaded=loadFromLocalStorage();
+if(!loaded){ toggleDebtMode(); }
+// if a saved file had no start date, still default it
+(function(){ let el=document.getElementById("startDate"); if(el && !el.value){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); } })();
+toggleDownPayment();
+toggleCustomTargets();
+calculateAll();
+
+</script>
+
+</body>
+</html>

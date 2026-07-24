@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>House Planning Calculator</title>
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    max-width: 750px;
+    margin: 40px auto;
+    padding: 20px;
+    background: #f7f7f7;
+}
+
+h1 {
+    text-align:center;
+}
+
+.box {
+    background:white;
+    border:1px solid #ccc;
+    border-radius:12px;
+    padding:25px;
+    margin-bottom:25px;
+}
+
+.box h2 {
+    margin-top:0;
+}
+
+.step-num {
+    display:inline-block;
+    background:#222;
+    color:white;
+    width:26px;
+    height:26px;
+    border-radius:50%;
+    text-align:center;
+    line-height:26px;
+    font-size:14px;
+    margin-right:8px;
+}
+
+label {
+    font-weight:bold;
+    font-size:14px;
+}
+
+input {
+    width:100%;
+    padding:10px;
+    margin-top:5px;
+    margin-bottom:15px;
+    font-size:16px;
+    box-sizing:border-box;
+    border:1px solid #bbb;
+    border-radius:6px;
+}
+
+.locked {
+    background:#f0f0f0;
+    color:#555;
+}
+
+button {
+    width:100%;
+    padding:14px;
+    background:#222;
+    color:white;
+    border:none;
+    border-radius:6px;
+    font-size:17px;
+    font-weight:bold;
+    cursor:pointer;
+    margin-top:10px;
+}
+
+button:hover {
+    background:#444;
+}
+
+.toggle-row {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:15px;
+    font-size:14px;
+}
+
+.compare {
+    display:flex;
+    gap:20px;
+    margin-top:20px;
+}
+
+.plan {
+    flex:1;
+    background:#222;
+    color:white;
+    border-radius:8px;
+    padding:20px;
+}
+
+.plan h3 {
+    margin-top:0;
+    text-align:center;
+}
+
+.big {
+    font-size:24px;
+    font-weight:bold;
+    text-align:center;
+    margin:10px 0;
+}
+
+.summary-line {
+    display:flex;
+    justify-content:space-between;
+    padding:8px 0;
+    border-bottom:1px solid rgba(255,255,255,0.2);
+    font-size:14px;
+}
+
+.summary-line:last-child {
+    border-bottom:none;
+}
+
+.flag-ok { color:#7CFC9B; font-weight:bold; }
+.flag-warn { color:#FFD27C; font-weight:bold; }
+.flag-bad { color:#FF8C8C; font-weight:bold; }
+
+</style>
+</head>
+
+<body>
+
+<h1>House Planning Calculator</h1>
+
+<div class="box">
+<h2><span class="step-num">1</span>Down Payment Savings</h2>
+
+<label>Monthly Savings</label>
+<input id="monthlySave" type="number" value="3000">
+
+<label>Years Saving</label>
+<input id="saveYears" type="number" value="5">
+
+<label>HYSA Interest Rate (%)</label>
+<input id="hysaRate" type="number" value="4">
+</div>
+
+<div class="box">
+<h2><span class="step-num">2</span>Mortgage</h2>
+
+<label>Home Price</label>
+<input id="homePrice" type="number" value="500000">
+
+<div class="toggle-row">
+<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
+<label style="font-weight:normal;margin:0;">Use my calculated savings as the down payment</label>
+</div>
+
+<label>Down Payment</label>
+<input id="downPayment" type="number" value="100000" class="locked" readonly>
+
+<label>Mortgage Interest Rate (%)</label>
+<input id="mortgageRate" type="number" value="6.5">
+</div>
+
+<div class="box">
+<h2><span class="step-num">3</span>Income Check</h2>
+
+<label>Yearly Take-Home Pay</label>
+<input id="yearlyIncome" type="number" value="72000">
+
+<label>Monthly Take-Home Pay (optional — overrides yearly ÷ 12)</label>
+<input id="monthlyIncome" type="number" value="">
+</div>
+
+<button onclick="calculateAll()">Calculate My Plan</button>
+
+<div class="compare" id="compareResult"></div>
+
+<script>
+
+function money(number){
+    return "$" + Math.round(number).toLocaleString();
+}
+
+function toggleDownPayment(){
+    let useSavings = document.getElementById("useSavingsToggle").checked;
+    let downInput = document.getElementById("downPayment");
+
+    if(useSavings){
+        downInput.readOnly = true;
+        downInput.classList.add("locked");
+    } else {
+        downInput.readOnly = false;
+        downInput.classList.remove("locked");
+    }
+}
+
+function calcSavingsBalance(){
+    let monthly = Number(document.getElementById("monthlySave").value);
+    let years = Number(document.getElementById("saveYears").value);
+    let rate = Number(document.getElementById("hysaRate").value) / 100;
+
+    let months = years * 12;
+    let balance = 0;
+
+    for(let i=0;i<months;i++){
+        balance = (balance + monthly) * (1 + rate/12);
+    }
+
+    return balance;
+}
+
+function calcMonthlyPayment(loan, rate, years){
+    let months = years * 12;
+    let monthlyRate = rate/100/12;
+
+    if(monthlyRate > 0){
+        return loan * (monthlyRate*Math.pow(1+monthlyRate,months)) / (Math.pow(1+monthlyRate,months)-1);
+    }
+    return loan/months;
+}
+
+function getIncomeFlag(percent){
+    if(percent <= 28){
+        return { flagClass:"flag-ok", flagText:"Within the common 28% guideline" };
+    } else if(percent <= 36){
+        return { flagClass:"flag-warn", flagText:"Above 28%, under 36% — worth watching" };
+    }
+    return { flagClass:"flag-bad", flagText:"Above 36% — stretched by most lenders" };
+}
+
+function buildPlanHTML(label, price, down, rate, years, monthlyIncome){
+    let loan = price - down;
+    let payment = calcMonthlyPayment(loan, rate, years);
+    let percent = (payment/monthlyIncome)*100;
+    let flag = getIncomeFlag(percent);
+
+    let totalPayments = payment*years*12;
+    let interest = totalPayments - loan;
+
+    return `
+        <div class="plan">
+            <h3>${label}</h3>
+            <div class="big">${money(payment)}/mo</div>
+            <div class="summary-line"><span>Loan Amount</span><span>${money(loan)}</span></div>
+            <div class="summary-line"><span>Total Interest</span><span>${money(interest)}</span></div>
+            <div class="summary-line"><span>% of Take-Home</span><span class="${flag.flagClass}">${percent.toFixed(1)}%</span></div>
+            <div style="margin-top:12px;text-align:center;" class="${flag.flagClass}">${flag.flagText}</div>
+        </div>
+    `;
+}
+
+function calculateAll(){
+    let useSavings = document.getElementById("useSavingsToggle").checked;
+    let savedBalance = calcSavingsBalance();
+
+    let downPaymentToUse;
+    if(useSavings){
+        downPaymentToUse = savedBalance;
+        document.getElementById("downPayment").value = Math.round(savedBalance);
+    } else {
+        downPaymentToUse = Number(document.getElementById("downPayment").value);
+    }
+
+    let price = Number(document.getElementById("homePrice").value);
+    let rate = Number(document.getElementById("mortgageRate").value);
+    let yearly = Number(document.getElementById("yearlyIncome").value);
+    let monthlyInput = Number(document.getElementById("monthlyIncome").value);
+    let monthlyIncome = monthlyInput > 0 ? monthlyInput : yearly/12;
+
+    document.getElementById("compareResult").innerHTML =
+        buildPlanHTML("30 Year", price, downPaymentToUse, rate, 30, monthlyIncome) +
+        buildPlanHTML("15 Year", price, downPaymentToUse, rate, 15, monthlyIncome);
+}
+
+calculateAll();
+
+</script>
+
+</body>
+</html>
