@@ -1034,7 +1034,8 @@ export default function Dashboard() {
 </div>
 </div>
 
-<!-- 3 DEBT (moved earlier - affects what's left over for house savings) -->
+<!-- 3/4 DEBT + GOALS share one column (moved earlier - affect what's left over for house savings) -->
+<div class="card-column">
 <div class="card collapsed" id="debtCard">
 <h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">3</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="debtBody">
@@ -1091,9 +1092,10 @@ export default function Dashboard() {
 </div>
 </div>
 </div>
+</div>
 
-<!-- 5 DOWN PAYMENT SAVINGS (moved later - now that debt/goals are accounted for) -->
-<div class="card">
+<!-- 5 DOWN PAYMENT SAVINGS (moved later - now that debt/goals are accounted for; full-width) -->
+<div class="card wide">
 <h2><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
 <label>Monthly Amount Set Aside for a House</label>
 <input id="monthlySave" class="money" type="text" placeholder="$0">
