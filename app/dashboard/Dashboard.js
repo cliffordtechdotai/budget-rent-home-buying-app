@@ -555,9 +555,6 @@ function calculateAll(){
     rentPctEl.textContent = (takeHome>0 && rentAmt>0) ? \`\${((rentAmt/takeHome)*100).toFixed(1)}% of take-home\` : "";
 
     let saveYears=numVal("saveYears")||0;
-    let projected=baseSavingsAtYear(saveYears);
-    document.getElementById("downPaymentLump").textContent=money(projected);
-    document.getElementById("downPaymentLumpLabel").textContent=\`saved for down payment in \${saveYears} yr\${saveYears!=1?"s":""}\`;
     let monthlySave=numVal("monthlySave");
     let savePct=takeHome>0?(monthlySave/takeHome)*100:0;
     document.getElementById("savePercentSub").textContent=\`\${money(monthlySave)}/mo · \${savePct.toFixed(1)}% of take-home\`;
@@ -646,6 +643,17 @@ function calculateAll(){
             ["pillEven","pillHighInterest","pillSmallBalance"].forEach(id=>document.getElementById(id).title="");
         }
     }
+
+    // Down payment projection: once debt is paid off, that freed-up payment rolls into
+    // house savings (same "debt-free-first" rollover the Custom Price mode's optimal
+    // search already uses) - applied consistently here so Section 5's own number and
+    // the Max-Afford price both reflect it too, not just the Custom mode search.
+    let debtFreeFirst=document.getElementById("debtFreeFirst").checked;
+    let projected = (anyDebt && debtFreeFirst)
+        ? savingsWithDebtPlan(saveYears, debtFreeYears, freedMonthly)
+        : baseSavingsAtYear(saveYears);
+    document.getElementById("downPaymentLump").textContent=money(projected);
+    document.getElementById("downPaymentLumpLabel").textContent=\`saved for down payment in \${saveYears} yr\${saveYears!=1?"s":""}\`;
 
     readGoalRows();
     let goalTotal=totalGoalMonthly();
@@ -1203,6 +1211,10 @@ export default function Dashboard() {
 <input type="checkbox" id="includeTaxMaint" checked onchange="calculateAll()">
 <label style="font-weight:normal;margin:0;">Count escrow (tax/insurance/PMI) toward the affordability guideline <span class="info" title="Escrow and PMI are always shown as their own line in the payment breakdown below. This only controls whether they count toward the 28%/36% affordability percentage — some guidelines quote Principal & Interest only, others quote the full payment.">i</span></label>
 </div>
+<div class="toggle-row">
+<input type="checkbox" id="debtFreeFirst" checked onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Be debt-free before buying <span class="info" title="On (recommended): once your debt clears, that freed-up payment automatically rolls into house savings - this applies to your Down Payment Savings projection and the Max-Afford price too, not just the Custom Price search below. Off: model buying while still carrying debt.">i</span></label>
+</div>
 
 <label>What do you want to see?</label>
 <select id="affordModeSelect" onchange="onAffordModeChange()">
@@ -1241,15 +1253,7 @@ export default function Dashboard() {
 <div><label>Plan Start Date <span class="info" title="Everything counts forward from this date. It's saved automatically, so if you entered a test date before, it'll keep loading that instead of today until you change it or click Reset.">i</span></label><div class="field-suffix"><div><input id="startDate" type="date"></div><div><button type="button" style="padding:10px 8px;font-size:12px;" onclick="resetStartDateToToday()">Reset</button></div></div></div>
 <div><label>Current Monthly Rent</label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
 </div>
-<div class="row2">
 <div><label>Annual Rent Increase (%)</label><input id="rentIncrease" type="number" placeholder="3" value="3"></div>
-<div style="display:flex;align-items:flex-end;">
-<div class="toggle-row" style="margin-bottom:16px;">
-<input type="checkbox" id="debtFreeFirst" checked onchange="calculateAll()">
-<label style="font-weight:normal;margin:0;">Be debt-free before buying</label>
-</div>
-</div>
-</div>
 <div class="toggle-row">
 <input type="checkbox" id="customTargets" onchange="toggleCustomTargets()">
 <label style="font-weight:normal;margin:0;">Custom targets</label>
