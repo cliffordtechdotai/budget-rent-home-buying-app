@@ -1,0 +1,30 @@
+{
+  "name": "budget-rent-home-buying-app",
+  "version": "1.0.0",
+  "description": "A free, privacy-first budgeting and house-planning calculator. Everything runs in the\r browser — no accounts, no server, no data leaves the user's machine. Plans can be saved\r to and loaded from a local file.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cliffordtechdotai/budget-rent-home-buying-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cliffordtechdotai/budget-rent-home-buying-app/issues"
+  },
+  "homepage": "https://github.com/cliffordtechdotai/budget-rent-home-buying-app#readme",
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "next": "^16.2.11",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remark": "^15.0.1",
+    "remark-html": "^16.0.1"
+  }
+}

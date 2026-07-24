@@ -18,28 +18,55 @@ to and loaded from a local file.
 
 ## Current state
 
-Single self-contained file: `budget-dashboard.html`. Open it in any modern browser
-(Chrome/Edge recommended for the file save/load feature). No build step.
+Next.js app with:
+- Dashboard calculator at `/` (same UI and math as before, now in React)
+- Article pages at `/articles` (read `.md` files from `content/articles/`)
+- Privacy policy at `/privacy`
+- Built for Vercel (zero-config deployment)
 
-## Tech direction
+## Tech stack
 
-- **Now:** static HTML/CSS/JS. Deploys to Vercel as-is.
-- **Next:** migrate to Next.js to add markdown-driven article pages under `/articles`.
-- **Later (only when a feature needs it):** a hosted Postgres (Neon/Supabase) for user
-  accounts, cloud-saved scenarios, or AI report generation.
+- **Framework:** Next.js 16+ with React
+- **Articles:** Markdown with frontmatter (title, date, description, image)
+- **Styling:** CSS Modules + globals
+- **Build:** `npm run build` → `.next/` folder (ready for Vercel)
+- **Privacy:** All calculation stays client-side. No backend, no data collection.
 
 ## Running locally
 
-Just open the HTML file, or serve the folder:
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-```bash
-npx serve .
-```
+2. Run dev server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000)
 
 ## Deploying
 
-Connect the repo to Vercel, or drag-and-drop the folder at vercel.com. No config needed
-for the static version.
+Connect the repo to Vercel — it auto-detects Next.js and deploys with zero config.
+
+## Adding articles
+
+1. Create a `.md` file in `content/articles/`:
+   ```markdown
+   ---
+   title: "Article Title"
+   date: "2026-07-24"
+   description: "One-line SEO summary"
+   image: "/articles/optional-image.jpg"
+   ---
+
+   Article body in Markdown...
+   ```
+
+2. Images go in `public/articles/`
+
+3. Run `npm run build` and deploy — the article appears automatically at `/articles/slug-name`
 
 ## Disclaimer
 
