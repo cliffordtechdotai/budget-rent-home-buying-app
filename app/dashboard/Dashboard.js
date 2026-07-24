@@ -757,21 +757,24 @@ calculateAll();
 `;
 
 export default function Dashboard() {
-  const containerRef = useRef(null);
-
   useEffect(() => {
-    const script = document.createElement('script');
-    script.textContent = DASHBOARD_SCRIPT;
-    script.type = 'text/javascript';
-    document.body.appendChild(script);
+    // Wait for DOM to be fully ready before injecting script
+    const timer = setTimeout(() => {
+      const script = document.createElement('script');
+      script.textContent = DASHBOARD_SCRIPT;
+      script.type = 'text/javascript';
+      document.body.appendChild(script);
 
-    return () => {
-      document.body.removeChild(script);
-    };
+      return () => {
+        try { document.body.removeChild(script); } catch(e) {}
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
-    <div ref={containerRef} dangerouslySetInnerHTML={{__html: `
+    <div dangerouslySetInnerHTML={{__html: `
       <h1>Home Buying Readiness Dashboard</h1>
 <p class="subtitle">See whether renting or buying makes sense, and how soon you'll be ready. Fill in each section top to bottom: income first, then spending, saving, debt, and the house.</p>
 
@@ -784,11 +787,270 @@ export default function Dashboard() {
 <div class="saveMsg" id="saveMsg"></div>
 <input type="file" id="fallbackFileInput" accept=".json" style="display:none;">
 
-<!-- Full card markup would go here, but for brevity I'm using a note -->
 <div class="dashboard">
-<div class="card wide" style="text-align:center;color:#666;">
-<p>Loading dashboard...</p>
+
+<!-- 1 TAKE HOME -->
+<div class="card">
+<h2><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span></h2>
+<label>Household</label>
+<select id="householdType" onchange="onHouseholdTypeChange()">
+<option value="single">Single</option>
+<option value="couple">Couple</option>
+</select>
+<div class="toggle-row">
+<input type="checkbox" id="calcFromGross" onchange="onIncomeModeChange()">
+<label style="font-weight:normal;margin:0;">Estimate take-home from gross salary + state</label>
 </div>
+<div id="singleManualBlock">
+<label>Yearly Take-Home Pay</label>
+<input id="yearlyIncomeSingle" class="money" type="text" placeholder="$0">
+</div>
+<div id="coupleManualBlock" style="display:none;">
+<div class="row2">
+<div><label>Person 1 Take-Home</label><input id="yearlyIncomePerson1" class="money" type="text" placeholder="$0"></div>
+<div><label>Person 2 Take-Home</label><input id="yearlyIncomePerson2" class="money" type="text" placeholder="$0"></div>
+</div>
+</div>
+<div id="grossIncomeBlock" style="display:none;">
+<label>State</label>
+<select id="stateSelect"></select>
+<div id="grossSingleBlock">
+<label>Gross Yearly Salary</label>
+<input id="grossSingle" class="money" type="text" placeholder="$0">
+</div>
+<div id="grossCoupleBlock" style="display:none;">
+<div class="row2">
+<div><label>Person 1 Gross Salary</label><input id="grossPerson1" class="money" type="text" placeholder="$0"></div>
+<div><label>Person 2 Gross Salary</label><input id="grossPerson2" class="money" type="text" placeholder="$0"></div>
+</div>
+</div>
+<div id="taxBreakdown" class="hint" style="margin-top:-4px;margin-bottom:12px;"></div>
+</div>
+<div id="incomeTotalLine" class="hint" style="margin-top:-6px;margin-bottom:12px;"></div>
+<label>Monthly Take-Home (optional, overrides yearly ÷ 12)</label>
+<input id="monthlyIncomeOverride" class="money" type="text" placeholder="$0">
+<div class="result-box">
+<div class="rb-big num" id="monthlyIncomeResult">$0</div>
+<div class="rb-label">take-home per month</div>
+<div class="rb-sub num" id="grossNetCompare"></div>
+</div>
+<div class="hint" style="margin-top:10px;">Tax estimate is approximate, not tax advice. Toggle the box above to compare your numbers with and without estimated tax; both are kept as you switch.</div>
+</div>
+
+<!-- 2 EXPENSES -->
+<div class="card">
+<h2><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span></h2>
+<label>Quick-Fill Preset</label>
+<select id="expensePreset" onchange="applyPreset()">
+<option value="custom">Custom (enter your own)</option>
+<option value="single">Average Single Person</option>
+<option value="married">Average Married / Couple</option>
+</select>
+<div class="row2">
+<div><label>Rent / Housing</label><input id="expRent" class="money" type="text" placeholder="$0"><div class="minipct" id="rentPct"></div></div>
+<div><label>Utilities</label><input id="expUtilities" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="row2">
+<div><label>Groceries</label><input id="expGroceries" class="money" type="text" placeholder="$0"></div>
+<div><label>Gas / Transport</label><input id="expGas" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="row2">
+<div><label>Insurance</label><input id="expInsurance" class="money" type="text" placeholder="$0"></div>
+<div><label>Subscriptions</label><input id="expSubs" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="row2">
+<div><label>Phone</label><input id="expPhone" class="money" type="text" placeholder="$0"></div>
+<div><label>Other / Misc</label><input id="expOther" class="money" type="text" placeholder="$0"></div>
+</div>
+<div class="result-box">
+<div class="rb-big num" id="expenseResult">$0</div>
+<div class="rb-label">total monthly expenses</div>
+<div class="rb-sub num" id="expensePctSub"></div>
+</div>
+</div>
+
+<!-- Cards 3-7 are collapsed for brevity in this file - the script initializes them -->
+<div class="card">
+<h2><span class="step">3</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
+<label>Monthly Amount Set Aside for a House</label>
+<input id="monthlySave" class="money" type="text" placeholder="$0">
+<input type="range" id="monthlySaveSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('monthlySave','monthlySaveSlider')">
+<div class="hint" id="monthlySaveCap" style="margin-top:2px;margin-bottom:12px;">Drag to set how much of your leftover goes to the house.</div>
+<div class="row2">
+<div><label>Years Saving</label><input id="saveYears" type="number" placeholder="5"></div>
+<div><label>HYSA Rate (%)</label><input id="hysaRate" type="number" placeholder="4"></div>
+</div>
+<label>Money Already Saved (optional)</label>
+<input id="existingSavings" class="money" type="text" placeholder="$0">
+<div class="toggle-row">
+<input type="checkbox" id="existingInHysa" checked>
+<label style="font-weight:normal;margin:0;">This is already in the HYSA earning interest</label>
+</div>
+<div class="result-box">
+<div class="rb-big num" id="downPaymentLump">$0</div>
+<div class="rb-label" id="downPaymentLumpLabel">saved for down payment</div>
+<div class="rb-sub num" id="savePercentSub"></div>
+</div>
+</div>
+
+<!-- 4 DEBT -->
+<div class="card collapsed" id="debtCard">
+<h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">4</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="debtBody">
+<div style="padding-top:4px;"></div>
+<div id="debtLumpBlock">
+<div class="row2">
+<div class="lf"><input id="lumpBalance" class="money" type="text" placeholder="$0"><div class="cap">Total Debt Balance</div></div>
+<div class="lf"><input id="lumpRate" type="number" placeholder="0"><div class="cap">Avg Interest Rate %</div></div>
+</div>
+<div style="height:14px;"></div>
+<div class="lf" style="margin-bottom:14px;">
+<input id="lumpPayment" class="money" type="text" placeholder="~$0">
+<div class="cap">Monthly Payment <span id="lumpPayHint"></span></div>
+</div>
+</div>
+<div id="debtListBlock" style="display:none;">
+<div id="debtList"></div>
+<button class="add-btn" onclick="addDebtRow()">+ Add a debt</button>
+</div>
+<div class="toggle-row" style="margin-top:6px;">
+<input type="checkbox" id="perDebtMode" onchange="toggleDebtMode()">
+<label style="font-weight:normal;margin:0;">Break into individual debts</label>
+</div>
+<div id="strategyBlock" style="display:none;">
+<label>Payoff Strategy</label>
+<div class="pillset">
+<div class="pill" id="pillEven" onclick="setDebtStrategy('even')">Even <span class="info" title="Even: split your extra money equally across every debt.">i</span></div>
+<div class="pill" id="pillHighInterest" onclick="setDebtStrategy('interest')">Avalanche <span class="info" title="Avalanche: pay the highest interest rate first.">i</span></div>
+<div class="pill" id="pillSmallBalance" onclick="setDebtStrategy('balance')">Snowball <span class="info" title="Snowball: pay the smallest balance first.">i</span></div>
+</div>
+</div>
+<label>Extra Toward Debt Each Month (optional)</label>
+<input id="debtExtra" class="money" type="text" placeholder="$0">
+<input type="range" id="debtExtraSlider" class="slider" min="0" max="1000" value="0" oninput="onSlider('debtExtra','debtExtraSlider')">
+<div class="hint" id="debtExtraCap" style="margin-top:2px;margin-bottom:14px;">Drag to use leftover money.</div>
+<div class="result-box">
+<div class="rb-big" id="debtPayoffResult">No debt entered</div>
+<div class="rb-label" id="debtPayoffLabel"></div>
+<div class="rb-sub" id="debtExtraNote"></div>
+</div>
+</div>
+</div>
+
+<!-- 5 GOALS -->
+<div class="card collapsed" id="goalCard">
+<h2 class="collapsible" onclick="toggleCollapse('goalCard')"><span class="step">5</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="goalBody">
+<div style="padding-top:4px;"></div>
+<div id="goalList"></div>
+<button class="add-btn" onclick="addGoalRow()">+ Add a goal</button>
+<div class="result-box">
+<div class="rb-big num" id="goalTotalResult">$0</div>
+<div class="rb-label">total goal contributions / month</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="dashboard" style="margin-top:20px;">
+
+<div class="card wide">
+<h2>Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span></h2>
+<div class="stat-grid">
+<div class="stat"><div class="big num" id="incomeStat">$0</div><div class="label">Take-Home</div></div>
+<div class="stat"><div class="big num" id="expenseStat">$0</div><div class="label">Expenses</div><div class="subpct" id="expenseStatPct"></div></div>
+<div class="stat"><div class="big num" id="saveStat">$0</div><div class="label">Down Pmt Savings</div><div class="subpct" id="saveStatPct"></div></div>
+<div class="stat"><div class="big num" id="debtStat">$0</div><div class="label">Debt Payment</div><div class="subpct" id="debtStatPct"></div></div>
+<div class="stat"><div class="big num" id="goalStat">$0</div><div class="label">Goals</div><div class="subpct" id="goalStatPct"></div></div>
+<div class="stat"><div class="big num" id="leftoverStat">$0</div><div class="label">Left Over</div><div class="subpct" id="leftoverStatPct"></div></div>
+</div>
+<div class="hint" id="overviewNote" style="margin-top:14px;text-align:center;"></div>
+</div>
+
+<div class="card wide">
+<h2>Mortgage: 15yr vs 30yr <span class="info hinfo" title="Compares a 15-year and 30-year loan side by side.">i</span></h2>
+<div class="row2">
+<div><label>Home Price</label><input id="homePrice" class="money" type="text" placeholder="$0"></div>
+<div><label>Mortgage Interest Rate (%)</label><input id="mortgageRate" type="number" placeholder="6.5"></div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
+<label style="font-weight:normal;margin:0;">Use my projected savings balance as the down payment</label>
+</div>
+<div class="row2">
+<div>
+<label>Down Payment (type a $ amount or a %)<span class="info" title="Put down 20% or more and you skip PMI.">i</span></label>
+<div class="field-suffix">
+<div><input id="downPayment" class="money locked" type="text" placeholder="$0" readonly></div>
+<div><select id="downPaymentMode" onchange="onDownModeChange()"><option value="dollar">$</option><option value="percent">%</option></select></div>
+</div>
+</div>
+<div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3"></div>
+</div>
+<div class="result-box" id="downResultBox" style="margin-top:6px;margin-bottom:16px;text-align:left;padding:14px 16px;">
+<div class="rb-sub num" id="downReadout" style="margin-top:0;"></div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="showPmi" onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Show PMI detail if under 20% down<span class="info" title="If your down payment is below 20%, this shows the estimated monthly PMI.">i</span></label>
+</div>
+<div class="result-box" id="pmiBox" style="display:none;text-align:left;padding:14px 16px;margin-bottom:16px;">
+<div class="rb-sub" id="pmiReadout" style="margin-top:0;"></div>
+</div>
+<div class="row2">
+<div><label>Property Tax + Maint. (%/yr)</label><input id="taxMaintPercent" type="number" placeholder="1.5"></div>
+<div style="display:flex;align-items:flex-end;">
+<div class="toggle-row" style="margin-bottom:16px;">
+<input type="checkbox" id="includeTaxMaint" onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Include tax + maintenance in affordability</label>
+</div>
+</div>
+</div>
+<div class="compare" id="compareResult"></div>
+</div>
+
+<div class="card wide">
+<h2>Optimal Plan: When Can You Responsibly Buy? <span class="info hinfo" title="Puts it all together.">i</span></h2>
+<div class="row2">
+<div><label>Plan Start Date</label><input id="startDate" type="date"></div>
+<div><label>Current Monthly Rent</label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
+</div>
+<div class="row2">
+<div><label>Annual Rent Increase (%)</label><input id="rentIncrease" type="number" placeholder="3"></div>
+<div style="display:flex;align-items:flex-end;">
+<div class="toggle-row" style="margin-bottom:16px;">
+<input type="checkbox" id="debtFreeFirst" checked onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Be debt-free before buying</label>
+</div>
+</div>
+</div>
+<div class="toggle-row">
+<input type="checkbox" id="customTargets" onchange="toggleCustomTargets()">
+<label style="font-weight:normal;margin:0;">Custom targets</label>
+</div>
+<div id="customTargetsBlock" style="display:none;">
+<div class="row2">
+<div><label>Target Down Payment (%)</label><input id="targetDownPct" type="number" placeholder="20"></div>
+<div><label>Max Payment (% of take-home)</label><input id="targetPaymentPct" type="number" placeholder="28"></div>
+</div>
+</div>
+<div class="writeup" id="optimalWriteup" style="font-size:14.5px;color:var(--ink);"></div>
+<div class="verdict" id="optimalVerdict"></div>
+<div class="compare" id="optimalResult" style="margin-top:14px;"></div>
+<div class="hint" style="margin-top:12px;">Assumes today's price and rate hold steady.</div>
+</div>
+
+<div class="card wide">
+<h2>Custom Payoff: Pay It Down Faster <span class="info hinfo" title="Models adding extra principal each month.">i</span></h2>
+<label>Extra Principal Toward the Mortgage Each Month</label>
+<input id="mortExtra" class="money" type="text" placeholder="$0">
+<input type="range" id="mortExtraSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('mortExtra','mortExtraSlider')">
+<div class="hint" id="mortExtraCap" style="margin-top:2px;margin-bottom:14px;">Models life after buying.</div>
+<div class="compare" id="customPayoffResult"></div>
+<div class="writeup" id="milestoneWriteup"></div>
+</div>
+
 </div>
     `}} />
   );
