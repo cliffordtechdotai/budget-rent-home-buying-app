@@ -713,7 +713,13 @@ function calculateAll(){
     applyCap("mortExtra","mortExtraSlider","mortExtraCap",mortExtra,mortExtraCap,"Extra principal pays the house off sooner");
 
     // ---- Max-Afford mode: what price can they afford at their current savings pace ----
+    // "Be debt-free before buying" checked: full payment budget, since debt is gone by
+    // the time you buy (and the projection above already grew faster from the rollover).
+    // Unchecked: you're modeling buying while still carrying debt, so that ongoing debt
+    // payment has to come out of the same take-home before the mortgage does - shrinking
+    // the ceiling here is what actually makes the checkbox change the max price shown.
     let maxCeiling = takeHome * getTargetPaymentPct()/100;
+    if(anyDebt && !debtFreeFirst){ maxCeiling = Math.max(0, maxCeiling - debtMonthly); }
     document.getElementById("maxAffordResult").innerHTML =
         buildMaxAffordColumn("30 Year",30,projected,numVal("mortgageRate"),maxCeiling,numVal("closingCostPercent"))
       + buildMaxAffordColumn("15 Year",15,projected,numVal("mortgageRate"),maxCeiling,numVal("closingCostPercent"));
@@ -936,11 +942,14 @@ window.onAffordModeChange=onAffordModeChange;
 window.acceptMaxAffordable=function(){
     setMoney("monthlySave", lastSaveCap);
     calculateAll();
+    showMsg(\`Set Monthly Amount Set Aside to \${money(lastSaveCap)} (your max affordable).\`);
 };
 window.applyLeftoverToSavings=function(){
     if(lastLeftover>0.5){
-        setMoney("monthlySave", numVal("monthlySave")+lastLeftover);
+        let newAmt=numVal("monthlySave")+lastLeftover;
+        setMoney("monthlySave", newAmt);
         calculateAll();
+        showMsg(\`Added \${money(lastLeftover)} leftover - Monthly Amount Set Aside is now \${money(newAmt)}.\`);
     }
 };
 window.acceptTargetTimeline=function(){
@@ -952,6 +961,7 @@ window.acceptTargetTimeline=function(){
     let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
     setMoney("monthlySave", requiredMonthly);
     calculateAll();
+    showMsg(\`Set Monthly Amount Set Aside to \${money(requiredMonthly)} to hit your \${saveYears}-year target.\`);
 };
 window.toggleDebtMode=toggleDebtMode;
 window.setDebtStrategy=setDebtStrategy;
