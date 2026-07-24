@@ -1160,8 +1160,12 @@ export default function Dashboard() {
 </div>
 </div>
 
-<!-- 5 DOWN PAYMENT SAVINGS (moved later - now that debt/goals are accounted for; full-width) -->
-<div class="card wide">
+<!-- 5 DOWN PAYMENT SAVINGS moved into row 2, paired side-by-side with card 6 below -->
+</div>
+
+<div class="dashboard" style="margin-top:20px;">
+
+<div class="card">
 <h2><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
 <label>Monthly Amount Set Aside for a House</label>
 <input id="monthlySave" class="money" type="text" placeholder="$0">
@@ -1184,14 +1188,16 @@ export default function Dashboard() {
 </div>
 </div>
 
-</div>
+<div class="card">
+<h2><span class="step">6</span>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
 
-<div class="dashboard" style="margin-top:20px;">
+<label>What do you want to see? <span class="info" title="Max Home Price I Can Afford: shows the priciest home you can afford at your current Down Payment Savings pace (Section 5) and the affordability target below - no price entry needed. How Long For a Specific Price: type an exact home price and see the soonest you could responsibly buy it, plus what to change if it's out of reach.">i</span></label>
+<select id="affordModeSelect" onchange="onAffordModeChange()">
+<option value="max">Max Home Price I Can Afford</option>
+<option value="custom">How Long For a Specific Price</option>
+</select>
 
-<div class="card wide">
-<h2>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
-
-<div class="row2">
+<div class="row2" style="margin-top:14px;">
 <div><label>Mortgage Interest Rate (%)</label><input id="mortgageRate" type="number" placeholder="6.5" value="6.5"></div>
 <div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3" value="3"></div>
 </div>
@@ -1215,13 +1221,9 @@ export default function Dashboard() {
 <input type="checkbox" id="debtFreeFirst" checked onchange="calculateAll()">
 <label style="font-weight:normal;margin:0;">Be debt-free before buying <span class="info" title="On (recommended): once your debt clears, that freed-up payment automatically rolls into house savings - this applies to your Down Payment Savings projection and the Max-Afford price too, not just the Custom Price search below. Off: model buying while still carrying debt.">i</span></label>
 </div>
+</div>
 
-<label>What do you want to see?</label>
-<select id="affordModeSelect" onchange="onAffordModeChange()">
-<option value="max">Max Home Price I Can Afford</option>
-<option value="custom">How Long For a Specific Price</option>
-</select>
-
+<div class="card wide">
 <div id="maxAffordBlock">
 <div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
 <div class="compare" id="maxAffordResult" style="margin-top:10px;"></div>
