@@ -780,19 +780,20 @@ calculateAll();
 
 export default function Dashboard() {
   useEffect(() => {
-    // Wait for DOM to be fully ready before injecting script
-    const timer = setTimeout(() => {
-      const script = document.createElement('script');
-      script.textContent = DASHBOARD_SCRIPT;
-      script.type = 'text/javascript';
-      document.body.appendChild(script);
+    // useEffect already runs after the DOM (including the dangerouslySetInnerHTML
+    // markup below) has been committed, so no delay is needed here. Guard against
+    // double-init (React Strict Mode's dev double-invoke, or a Fast Refresh remount
+    // while a previous run's listeners are still attached) with a flag that's reset
+    // on cleanup, instead of leaving orphaned script tags/listeners piled up.
+    if (window.__dashboardInitialized) return;
+    window.__dashboardInitialized = true;
 
-      return () => {
-        try { document.body.removeChild(script); } catch(e) {}
-      };
-    }, 100);
+    const run = new Function(DASHBOARD_SCRIPT);
+    run();
 
-    return () => clearTimeout(timer);
+    return () => {
+      window.__dashboardInitialized = false;
+    };
   }, []);
 
   return (
