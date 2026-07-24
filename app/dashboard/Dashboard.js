@@ -293,15 +293,31 @@ function updateDownReadout(price,down,saved,closing){
 }
 
 function buildPlanHTML(label,price,down,rate,years,checkIncome,closing,inc){
-    let loan=Math.max(0,price-down),payment=affordabilityPayment(price,down,rate,years,inc);
-    let pct=checkIncome>0?(payment/checkIncome)*100:0,f=getFlag(pct);
+    let loan=Math.max(0,price-down);
     let pi=calcMonthlyPayment(loan,rate,years),interest=pi*years*12-loan;
-    return \`<div class="plan"><h3>\${label}</h3><div class="big">\${money(payment)}/mo</div>
+    let escrow=monthlyTaxMaint(price);
+    let pmi=monthlyPMI(price,down);
+    let totalPayment=pi+escrow+pmi;
+    // the checkbox controls whether escrow+PMI count toward the affordability guideline,
+    // not whether they're shown - the dollar breakdown below is always complete
+    let checkAmount=inc?totalPayment:pi;
+    let pct=checkIncome>0?(checkAmount/checkIncome)*100:0,f=getFlag(pct);
+    let taxMaintPct=numVal("taxMaintPercent");
+    let downPct=price>0?(down/price)*100:0;
+    let escrowTitle=\`Escrow: property tax + homeowners insurance + a maintenance reserve, collected monthly and set aside for these costs. Estimated as Home Price x \${taxMaintPct}%/yr div 12: \${money(price)} x \${taxMaintPct}% / 12 = \${money(escrow)}/mo.\`;
+    let pmiTitle="PMI (Private Mortgage Insurance) protects the lender, not you. It only applies when your down payment is under 20% of the home price, and drops off automatically once you reach 20% equity. Estimated here as 0.6%/yr of your loan balance.";
+    let pmiLine = pmi>0
+        ? \`<div class="summary-line"><span>PMI <span class="info" title="\${pmiTitle}">i</span></span><span>\${money(pmi)}</span></div>\`
+        : (price>0 ? \`<div class="summary-line"><span>PMI</span><span class="flag-ok">None (\${downPct.toFixed(0)}%+ down)</span></div>\` : "");
+    return \`<div class="plan"><h3>\${label}</h3><div class="big">\${money(totalPayment)}/mo</div>
+        <div class="summary-line"><span>Principal & Interest</span><span>\${money(pi)}</span></div>
+        <div class="summary-line"><span>Escrow (Tax/Ins/Maint) <span class="info" title="\${escrowTitle}">i</span></span><span>\${money(escrow)}</span></div>
+        \${pmiLine}
         <div class="summary-line"><span>Loan Amount</span><span>\${money(loan)}</span></div>
-        <div class="summary-line"><span>Total Interest</span><span>\${money(interest)}</span></div>
+        <div class="summary-line"><span>Total Interest (P&I only)</span><span>\${money(interest)}</span></div>
         <div class="summary-line"><span>Cash at Closing</span><span>\${money(down+closing)}</span></div>
         <div class="summary-line"><span>% of Take-Home</span><span class="\${f.c}">\${pct.toFixed(1)}%</span></div>
-        <div style="margin-top:10px;text-align:center;" class="\${f.c}">\${f.t}\${inc?" · incl. tax+maint":""}</div></div>\`;
+        <div style="margin-top:10px;text-align:center;" class="\${f.c}">\${f.t}\${inc?" · incl. escrow"+(pmi>0?"+PMI":""):" · P&I only"}</div></div>\`;
 }
 
 function rentPaidOverYears(years){ let rent=numVal("currentRent"),inc=numVal("rentIncrease")/100,t=0,y=rent*12; for(let i=0;i<years;i++){ t+=y; y*=(1+inc); } return t; }
@@ -737,6 +753,12 @@ window.onSlider=onSlider;
 window.addDebtRow=addDebtRow;
 window.addGoalRow=addGoalRow;
 window.removeRow=removeRow;
+window.resetStartDateToToday=function(){
+    let el=document.getElementById("startDate");
+    let t=new Date();
+    el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0");
+    calculateAll();
+};
 
 MONEY_IDS.forEach(id=>{ if(id==="lumpPayment") return; let el=document.getElementById(id); if(el) el.addEventListener("input",()=>formatMoneyField(el)); });
 document.getElementById("lumpPayment").addEventListener("focus",function(){ if(this.classList.contains("estimated")){ this.value=""; this.classList.remove("estimated"); } });
@@ -877,8 +899,8 @@ export default function Dashboard() {
 <input type="range" id="monthlySaveSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('monthlySave','monthlySaveSlider')">
 <div class="hint" id="monthlySaveCap" style="margin-top:2px;margin-bottom:12px;">Drag to set how much of your leftover goes to the house.</div>
 <div class="row2">
-<div><label>Years Saving</label><input id="saveYears" type="number" placeholder="5"></div>
-<div><label>HYSA Rate (%)</label><input id="hysaRate" type="number" placeholder="4"></div>
+<div><label>Years Saving</label><input id="saveYears" type="number" placeholder="3" value="3"></div>
+<div><label>HYSA Rate (%)</label><input id="hysaRate" type="number" placeholder="3" value="3"></div>
 </div>
 <label>Money Already Saved (optional)</label>
 <input id="existingSavings" class="money" type="text" placeholder="$0">
@@ -972,7 +994,7 @@ export default function Dashboard() {
 <h2>Mortgage: 15yr vs 30yr <span class="info hinfo" title="Compares a 15-year and 30-year loan side by side.">i</span></h2>
 <div class="row2">
 <div><label>Home Price</label><input id="homePrice" class="money" type="text" placeholder="$0"></div>
-<div><label>Mortgage Interest Rate (%)</label><input id="mortgageRate" type="number" placeholder="6.5"></div>
+<div><label>Mortgage Interest Rate (%)</label><input id="mortgageRate" type="number" placeholder="6.5" value="6.5"></div>
 </div>
 <div class="toggle-row">
 <input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
@@ -986,7 +1008,7 @@ export default function Dashboard() {
 <div><select id="downPaymentMode" onchange="onDownModeChange()"><option value="dollar">$</option><option value="percent">%</option></select></div>
 </div>
 </div>
-<div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3"></div>
+<div><label>Closing Costs (% of price)</label><input id="closingCostPercent" type="number" placeholder="3" value="3"></div>
 </div>
 <div class="result-box" id="downResultBox" style="margin-top:6px;margin-bottom:16px;text-align:left;padding:14px 16px;">
 <div class="rb-sub num" id="downReadout" style="margin-top:0;"></div>
@@ -999,11 +1021,11 @@ export default function Dashboard() {
 <div class="rb-sub" id="pmiReadout" style="margin-top:0;"></div>
 </div>
 <div class="row2">
-<div><label>Property Tax + Maint. (%/yr)</label><input id="taxMaintPercent" type="number" placeholder="1.5"></div>
+<div><label>Property Tax + Insurance + Maint. (%/yr, est.) <span class="info" title="A combined rough estimate: property tax + homeowners insurance + a maintenance/upkeep reserve, as a % of home price per year. Real lender escrow accounts only hold tax + insurance (+ PMI if under 20% down) — the maintenance portion here is a personal reserve baked into this one number for simplicity, not something the bank collects.">i</span></label><input id="taxMaintPercent" type="number" placeholder="1.5" value="1.5"></div>
 <div style="display:flex;align-items:flex-end;">
 <div class="toggle-row" style="margin-bottom:16px;">
-<input type="checkbox" id="includeTaxMaint" onchange="calculateAll()">
-<label style="font-weight:normal;margin:0;">Include tax + maintenance in affordability</label>
+<input type="checkbox" id="includeTaxMaint" checked onchange="calculateAll()">
+<label style="font-weight:normal;margin:0;">Count escrow (tax/insurance/PMI) toward the 28% affordability guideline <span class="info" title="Escrow and PMI are always shown as their own line in the payment breakdown below. This only controls whether they count toward the 28%/36% affordability percentage — some guidelines quote Principal & Interest only, others quote the full payment.">i</span></label>
 </div>
 </div>
 </div>
@@ -1013,11 +1035,11 @@ export default function Dashboard() {
 <div class="card wide">
 <h2>Optimal Plan: When Can You Responsibly Buy? <span class="info hinfo" title="Puts it all together.">i</span></h2>
 <div class="row2">
-<div><label>Plan Start Date</label><input id="startDate" type="date"></div>
+<div><label>Plan Start Date <span class="info" title="Everything counts forward from this date. It's saved automatically, so if you entered a test date before, it'll keep loading that instead of today until you change it or click Reset.">i</span></label><div class="field-suffix"><div><input id="startDate" type="date"></div><div><button type="button" style="padding:10px 8px;font-size:12px;" onclick="resetStartDateToToday()">Reset</button></div></div></div>
 <div><label>Current Monthly Rent</label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
 </div>
 <div class="row2">
-<div><label>Annual Rent Increase (%)</label><input id="rentIncrease" type="number" placeholder="3"></div>
+<div><label>Annual Rent Increase (%)</label><input id="rentIncrease" type="number" placeholder="3" value="3"></div>
 <div style="display:flex;align-items:flex-end;">
 <div class="toggle-row" style="margin-bottom:16px;">
 <input type="checkbox" id="debtFreeFirst" checked onchange="calculateAll()">
