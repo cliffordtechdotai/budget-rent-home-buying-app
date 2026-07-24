@@ -25,8 +25,8 @@ const STATE_RATES = {
  WV:{name:"West Virginia",rate:4.5},WI:{name:"Wisconsin",rate:5.5},WY:{name:"Wyoming",rate:0}
 };
 
-const MONEY_IDS = ["yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","grossSingle","grossPerson1","grossPerson2","grossJoint","monthlyIncomeOverride","monthlySave","existingSavings","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","lumpBalance","lumpPayment","debtExtra","mortExtra","homePrice"];
-const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct"];
+const MONEY_IDS = ["yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","grossJoint","monthlyIncomeOverride","monthlySave","existingSavings","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","lumpBalance","lumpPayment","debtExtra","mortExtra","homePrice"];
+const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct"];
 
 const THRESHOLD = 28;
 const MAX_SEARCH_YEARS = 40;
@@ -145,8 +145,11 @@ function toggleDebtMode(){
 function updateHouseholdVisibility(){
     let t=document.getElementById("householdType").value, g=document.getElementById("calcFromGross").checked;
     let joint=document.getElementById("jointIncomeMode").checked;
+    document.getElementById("jointIncomeToggleBlock").style.display=(t==="couple")?"block":"none";
     document.getElementById("singleManualBlock").style.display=(!g&&t!=="couple")?"block":"none";
     document.getElementById("coupleManualBlock").style.display=(!g&&t==="couple")?"block":"none";
+    document.getElementById("coupleSplitBlock").style.display=(!g&&t==="couple"&&!joint)?"block":"none";
+    document.getElementById("coupleJointBlock").style.display=(!g&&t==="couple"&&joint)?"block":"none";
     document.getElementById("grossIncomeBlock").style.display=g?"block":"none";
     document.getElementById("grossSingleBlock").style.display=(g&&t!=="couple")?"block":"none";
     document.getElementById("grossCoupleBlock").style.display=(g&&t==="couple")?"block":"none";
@@ -190,7 +193,14 @@ function computeGrossBreakdown(){
     }
     return calcNetIncome(numVal("grossSingle"),"single",p);
 }
-function getYearlyIncome(){ if(document.getElementById("calcFromGross").checked) return computeGrossBreakdown().net; if(document.getElementById("householdType").value==="couple") return numVal("yearlyIncomePerson1")+numVal("yearlyIncomePerson2"); return numVal("yearlyIncomeSingle"); }
+function getYearlyIncome(){
+    if(document.getElementById("calcFromGross").checked) return computeGrossBreakdown().net;
+    if(document.getElementById("householdType").value==="couple"){
+        let joint=document.getElementById("jointIncomeMode").checked;
+        return joint ? numVal("yearlyIncomeJoint") : numVal("yearlyIncomePerson1")+numVal("yearlyIncomePerson2");
+    }
+    return numVal("yearlyIncomeSingle");
+}
 function getMonthlyTakeHome(){ let o=numVal("monthlyIncomeOverride"); return o>0?o:getYearlyIncome()/12; }
 
 // Savings
@@ -1051,6 +1061,12 @@ export default function Dashboard() {
 <option value="single">Single</option>
 <option value="couple">Couple</option>
 </select>
+<div id="jointIncomeToggleBlock" style="display:none;">
+<div class="toggle-row">
+<input type="checkbox" id="jointIncomeMode" onchange="onJointIncomeModeChange()">
+<label style="font-weight:normal;margin:0;">Enter as one combined household income instead of splitting by person</label>
+</div>
+</div>
 <div class="toggle-row">
 <input type="checkbox" id="calcFromGross" onchange="onIncomeModeChange()">
 <label style="font-weight:normal;margin:0;">Estimate take-home from gross salary + state</label>
@@ -1060,9 +1076,15 @@ export default function Dashboard() {
 <input id="yearlyIncomeSingle" class="money" type="text" placeholder="$0">
 </div>
 <div id="coupleManualBlock" style="display:none;">
+<div id="coupleSplitBlock">
 <div class="row2">
 <div><label>Person 1 Take-Home</label><input id="yearlyIncomePerson1" class="money" type="text" placeholder="$0"></div>
 <div><label>Person 2 Take-Home</label><input id="yearlyIncomePerson2" class="money" type="text" placeholder="$0"></div>
+</div>
+</div>
+<div id="coupleJointBlock" style="display:none;">
+<label>Combined Household Take-Home</label>
+<input id="yearlyIncomeJoint" class="money" type="text" placeholder="$0">
 </div>
 </div>
 <div id="grossIncomeBlock" style="display:none;">
@@ -1073,10 +1095,6 @@ export default function Dashboard() {
 <input id="grossSingle" class="money" type="text" placeholder="$0">
 </div>
 <div id="grossCoupleBlock" style="display:none;">
-<div class="toggle-row">
-<input type="checkbox" id="jointIncomeMode" onchange="onJointIncomeModeChange()">
-<label style="font-weight:normal;margin:0;">Enter as one combined household income instead of splitting by person</label>
-</div>
 <div id="grossSplitBlock">
 <div class="row2">
 <div><label>Person 1 Gross Salary</label><input id="grossPerson1" class="money" type="text" placeholder="$0"></div>
