@@ -70,16 +70,16 @@ button { width:100%; padding:12px; background:var(--ink); color:#fff; border:1px
 button:hover { opacity:0.82; }
 button.add-btn { background:transparent; color:var(--ink); border:1px dashed var(--line-strong); font-size:13px; padding:10px; margin-top:4px; }
 button.add-btn:hover { background:#f6f6f6; opacity:1; border-color:var(--ink); }
-.remove-x { width:auto; background:transparent; color:var(--ink-faint); border:none; padding:0 6px; font-size:18px; line-height:1; cursor:pointer; align-self:flex-start; margin-top:6px; }
-.remove-x:hover { color:var(--bad); opacity:1; }
+.remove-x { position:absolute; top:8px; right:8px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; color:var(--ink-faint); border:none; padding:0; border-radius:4px; font-size:18px; line-height:1; cursor:pointer; }
+.remove-x:hover { color:var(--bad); opacity:1; background:rgba(0,0,0,0.04); }
 
 /* labelled field: input with small caption underneath */
 .lf { margin-bottom:0; }
 .lf .cap { font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-faint); margin-top:3px; text-align:left; }
 .lf input { margin-bottom:0; }
 
-.list-row { display:flex; gap:8px; align-items:flex-start; padding:12px; margin-bottom:10px; border:1px solid var(--line); border-radius:5px; background:#fafafa; }
-.list-row > div { flex:1; }
+.list-row { position:relative; display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; padding:14px 36px 14px 14px; margin-bottom:10px; border:1px solid var(--line); border-radius:5px; background:#fafafa; }
+.list-row > div { flex:1 1 110px; min-width:90px; }
 
 .pillset { display:flex; gap:8px; margin:4px 0 10px; }
 .pill { flex:1; text-align:center; padding:9px; font-size:12.5px; border:1px solid var(--line-strong); border-radius:4px; cursor:pointer; color:var(--ink-soft); background:#fff; transition:all 0.12s; display:flex; align-items:center; justify-content:center; gap:5px; }

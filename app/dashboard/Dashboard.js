@@ -196,18 +196,20 @@ function estimateMinPayment(balance){ return balance>0 ? Math.max(25, balance*MI
 function getDebtSet(){
     if(document.getElementById("perDebtMode").checked){
         readDebtRows();
-        return debtRows.filter(d=>d.balance>0).map(d=>({balance:d.balance,rate:d.rate,minPayment:d.minPayment>0?d.minPayment:estimateMinPayment(d.balance)}));
+        return debtRows.filter(d=>d.balance>0).map(d=>({name:d.name||"Debt",balance:d.balance,rate:d.rate,minPayment:d.minPayment>0?d.minPayment:estimateMinPayment(d.balance)}));
     }
     let bal=numVal("lumpBalance");
     if(bal<=0) return [];
     let rate=numVal("lumpRate");
     let pay=lumpPaymentEdited?numVal("lumpPayment"):estimateMinPayment(bal);
-    return [{balance:bal,rate:rate,minPayment:pay}];
+    return [{name:"Total Debt",balance:bal,rate:rate,minPayment:pay}];
 }
 
-function simulateDebtPayoff(rows, extra, strategy){
-    let debts=rows.filter(d=>d.balance>0).map(d=>({...d}));
-    if(debts.length===0) return {months:0,empty:true,interest:0};
+// Core simulation: same payoff math as before, plus tracks the month each individual
+// debt's balance first reaches zero, so payoff order/timing is visible per-debt.
+function simulateDebtPayoffDetailed(rows, extra, strategy){
+    let debts=rows.filter(d=>d.balance>0).map(d=>({...d, payoffMonth:null}));
+    if(debts.length===0) return {months:0,empty:true,interest:0,perDebt:[]};
     let months=0,totalInterest=0;
     while(debts.some(d=>d.balance>0)&&months<1200){
         let pool=extra;
@@ -223,9 +225,17 @@ function simulateDebtPayoff(rows, extra, strategy){
             for(let d of active){ if(pool<=0) break; let pay=Math.min(pool,d.balance); d.balance-=pay; pool-=pay; }
         }
         months++;
-        if(pool<=0&&extra===0){ let stuck=debts.some(d=>d.balance>0&&d.minPayment<=d.balance*(d.rate/100/12)); if(stuck&&months>2) return {months:null,stuck:true}; }
+        for(let d of debts){ if(d.balance<=0.005 && d.payoffMonth===null){ d.payoffMonth=months; } }
+        if(pool<=0&&extra===0){ let stuck=debts.some(d=>d.balance>0&&d.minPayment<=d.balance*(d.rate/100/12)); if(stuck&&months>2) return {months:null,stuck:true,perDebt:[]}; }
     }
-    return months>=1200?{months:null,stuck:true}:{months,empty:false,interest:Math.round(totalInterest)};
+    if(months>=1200) return {months:null,stuck:true,perDebt:[]};
+    let perDebt=debts.map(d=>({name:d.name||"Debt",payoffMonth:d.payoffMonth})).sort((a,b)=>a.payoffMonth-b.payoffMonth);
+    return {months,empty:false,interest:Math.round(totalInterest),perDebt};
+}
+
+function simulateDebtPayoff(rows, extra, strategy){
+    let r=simulateDebtPayoffDetailed(rows, extra, strategy);
+    return {months:r.months, empty:r.empty, interest:r.interest, stuck:r.stuck};
 }
 
 function totalMinPayments(set){ return set.reduce((s,d)=>s+d.minPayment,0); }
@@ -575,21 +585,65 @@ function calculateAll(){
     let debtMonthly = anyDebt ? baseMin+extra : 0;
 
     let dRes=document.getElementById("debtPayoffResult"),dLab=document.getElementById("debtPayoffLabel"),dNote=document.getElementById("debtExtraNote");
+    let timelineEl=document.getElementById("debtTimeline");
+    let cmpEl=document.getElementById("strategyCompare");
+    let perDebtOn=document.getElementById("perDebtMode").checked;
     let debtFreeYears=0, freedMonthly=debtMonthly;
     if(!anyDebt){
         dRes.textContent="No debt entered"; dRes.className="rb-big"; dLab.textContent=""; dNote.textContent=""; debtFreeYears=0; freedMonthly=0;
+        timelineEl.innerHTML=""; cmpEl.innerHTML="";
+        ["pillEven","pillHighInterest","pillSmallBalance"].forEach(id=>document.getElementById(id).title="");
     } else {
-        let sim=simulateDebtPayoff(debtSet, extra, debtStrategy);
+        let sim=simulateDebtPayoffDetailed(debtSet, extra, debtStrategy);
         if(sim.stuck||sim.months===null){
             dRes.textContent="Payment too low"; dRes.className="rb-big flag-bad"; dLab.textContent="raise the payment or add extra"; dNote.textContent="";
             debtFreeYears=MAX_SEARCH_YEARS+1;
+            timelineEl.innerHTML="";
         } else {
             let yrs=Math.floor(sim.months/12),rem=sim.months%12;
             dRes.textContent=(yrs>0?yrs+"y ":"")+rem+"m"; dRes.className="rb-big flag-ok"; dLab.textContent="until debt-free";
             let stratName={even:"Even · ",interest:"Avalanche · ",balance:"Snowball · "};
-            let stratNote = document.getElementById("perDebtMode").checked ? (stratName[debtStrategy]||"") : "";
+            let stratNote = perDebtOn ? (stratName[debtStrategy]||"") : "";
             dNote.textContent=\`\${stratNote}Paying \${money(debtMonthly)}/mo · \${money(sim.interest)} total interest\`;
             debtFreeYears=sim.months/12;
+
+            if(perDebtOn && sim.perDebt.length>0){
+                timelineEl.innerHTML="<b>Payoff order:</b><br>" + sim.perDebt.map(d=>\`\${d.name}: \${dateFromMonths(d.payoffMonth)}\`).join("<br>");
+            } else {
+                timelineEl.innerHTML="";
+            }
+        }
+
+        // strategy comparison: only meaningful with 2+ debts to actually prioritize between
+        if(perDebtOn && debtSet.length>=2){
+            let names={even:"Even",interest:"Avalanche",balance:"Snowball"};
+            let pillIds={even:"pillEven",interest:"pillHighInterest",balance:"pillSmallBalance"};
+            let results={};
+            ["even","interest","balance"].forEach(s=>{ results[s]=simulateDebtPayoffDetailed(debtSet, extra, s); });
+            ["even","interest","balance"].forEach(s=>{
+                let r=results[s], el=document.getElementById(pillIds[s]);
+                el.title = (r.months===null||r.stuck)
+                    ? \`\${names[s]}: payment too low to pay off.\`
+                    : \`\${names[s]}: debt-free \${dateFromMonths(r.months)} · \${money(r.interest)} total interest\`;
+            });
+            let valid=["even","interest","balance"].filter(s=>results[s].months!==null && !results[s].stuck);
+            if(valid.length===3){
+                let fastest=valid.reduce((a,b)=>results[a].months<results[b].months?a:b);
+                let cheapest=valid.reduce((a,b)=>results[a].interest<results[b].interest?a:b);
+                cmpEl.innerHTML = ["even","interest","balance"].map(s=>{
+                    let r=results[s];
+                    let tags=[];
+                    if(s===fastest) tags.push("fastest");
+                    if(s===cheapest) tags.push("least interest");
+                    let tag=tags.length?\` <span class="flag-ok">(\${tags.join(" & ")})</span>\`:"";
+                    return \`<b>\${names[s]}</b>: \${fmtMonths(r.months)} · \${money(r.interest)} interest\${tag}\`;
+                }).join("<br>");
+            } else {
+                cmpEl.innerHTML="";
+            }
+        } else {
+            cmpEl.innerHTML="";
+            ["pillEven","pillHighInterest","pillSmallBalance"].forEach(id=>document.getElementById(id).title="");
         }
     }
 
@@ -1060,12 +1114,13 @@ export default function Dashboard() {
 <label style="font-weight:normal;margin:0;">Break into individual debts</label>
 </div>
 <div id="strategyBlock" style="display:none;">
-<label>Payoff Strategy</label>
+<label>Payoff Strategy <span class="info" title="Hover Even/Avalanche/Snowball below for each strategy's debt-free date and total interest.">i</span></label>
 <div class="pillset">
-<div class="pill" id="pillEven" onclick="setDebtStrategy('even')">Even <span class="info" title="Even: split your extra money equally across every debt.">i</span></div>
-<div class="pill" id="pillHighInterest" onclick="setDebtStrategy('interest')">Avalanche <span class="info" title="Avalanche: pay the highest interest rate first.">i</span></div>
-<div class="pill" id="pillSmallBalance" onclick="setDebtStrategy('balance')">Snowball <span class="info" title="Snowball: pay the smallest balance first.">i</span></div>
+<div class="pill" id="pillEven" title="" onclick="setDebtStrategy('even')">Even <span class="info" title="Even: split your extra money equally across every debt.">i</span></div>
+<div class="pill" id="pillHighInterest" title="" onclick="setDebtStrategy('interest')">Avalanche <span class="info" title="Avalanche: pay the highest interest rate first.">i</span></div>
+<div class="pill" id="pillSmallBalance" title="" onclick="setDebtStrategy('balance')">Snowball <span class="info" title="Snowball: pay the smallest balance first.">i</span></div>
 </div>
+<div class="hint" id="strategyCompare" style="margin-bottom:14px;"></div>
 </div>
 <label>Extra Toward Debt Each Month (optional)</label>
 <input id="debtExtra" class="money" type="text" placeholder="$0">
@@ -1076,6 +1131,7 @@ export default function Dashboard() {
 <div class="rb-label" id="debtPayoffLabel"></div>
 <div class="rb-sub" id="debtExtraNote"></div>
 </div>
+<div class="hint" id="debtTimeline" style="margin-top:10px;"></div>
 </div>
 </div>
 
