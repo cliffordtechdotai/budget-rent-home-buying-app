@@ -684,10 +684,12 @@ function calculateAll(){
         : \`Left over is money not yet assigned. Slide it into savings, debt, or extra mortgage payments to put it to work.\`)
         + \` <span class="info" title="\${breakdownText}">i</span>\`;
 
+    // Debt payoff gets priority over house savings: debt extra draws from the full pool
+    // first, and house savings only gets whatever's left over after that.
     let pool=Math.max(0, takeHome - expenses - goalTotal - (anyDebt?baseMin:0));
-    let saveCap=pool;
+    let debtExtraCap=pool;
+    let saveCap=Math.max(0, pool - extra);
     lastSaveCap=saveCap;
-    let debtExtraCap=Math.max(0, pool - monthlySave);
     let mortExtraCap=Math.max(0, pool - extra);
     function applyCap(inputId, sliderId, capId, value, cap, label){
         let slider=document.getElementById(sliderId), input=document.getElementById(inputId), capEl=document.getElementById(capId);
