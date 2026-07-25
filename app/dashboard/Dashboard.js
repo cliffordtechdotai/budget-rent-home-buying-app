@@ -46,10 +46,10 @@ let debtRows=[];
 let goalRows=[];
 let rowCounter=0;
 let lumpPaymentEdited=false;
-let lastSaveCap=0;
-let lastLeftover=0;
 
-function money(n){ return "$"+Math.round(n).toLocaleString("en-US"); }
+// Math.round(-0.33) is -0, which formats as "$-0". Normalise so a rounding remainder
+// never renders as negative zero.
+function money(n){ let r=Math.round(n); if(Object.is(r,-0)) r=0; return "$"+r.toLocaleString("en-US"); }
 function getStartDate(){
     let v=document.getElementById("startDate").value;
     if(v){ let d=new Date(v+"T00:00:00"); if(!isNaN(d)) return d; }
@@ -656,12 +656,13 @@ function renderOptimalPlan(c){
             let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
             let extraNeeded=requiredMonthly-monthlySave;
             if(extraNeeded>0.5){
-                gapEl.innerHTML=\`At your current pace, this takes \${r30.year} years instead of your \${saveYears}-year target. To hit \${saveYears} years instead, you'd need to save about <b>\${money(requiredMonthly)}/mo</b> (\${money(extraNeeded)} more than now).\`;
-                let affordable=requiredMonthly<=saveCap;
-                btnRow.innerHTML=\`<button type="button" onclick="acceptMaxAffordable()">Save the Max I Can Afford</button>\`
-                  + (affordable
-                      ? \`<button type="button" onclick="acceptTargetTimeline()">Hit My \${saveYears}-Year Target</button>\`
-                      : \`<button type="button" disabled style="opacity:0.5;cursor:not-allowed;" title="That's more than you can currently afford (max \${money(saveCap)}/mo)">Hit My \${saveYears}-Year Target</button>\`);
+                // Stating the number is enough - the user sets it on the Section 3 slider
+                // themselves. Buttons that wrote the value back were just a slower slider.
+                let reachable = requiredMonthly<=saveCap
+                    ? ""
+                    : \` That's more than your budget currently allows (max \${money(saveCap)}/mo), so a \${saveYears}-year target isn't reachable without cutting expenses or lowering the price.\`;
+                gapEl.innerHTML=\`At your current pace, this takes \${r30.year} years instead of your \${saveYears}-year target. To hit \${saveYears} years instead, you'd need to save about <b>\${money(requiredMonthly)}/mo</b> (\${money(extraNeeded)} more than now).\${reachable}\`;
+                btnRow.innerHTML="";
             } else {
                 gapEl.innerHTML=""; btnRow.innerHTML="";
             }
@@ -856,7 +857,6 @@ function calculateAll(){
 
     let mortExtra=numVal("mortExtra");
     let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal-mortExtra;
-    lastLeftover=leftover;
     document.getElementById("incomeStat").textContent=money(takeHome);
     document.getElementById("expenseStat").textContent=money(expenses);
     document.getElementById("saveStat").textContent=money(monthlySave);
@@ -892,7 +892,6 @@ function calculateAll(){
     let pool=Math.max(0, takeHome - expenses - goalTotal - (anyDebt?baseMin:0));
     let debtExtraCap=pool;
     let saveCap=Math.max(0, pool - extra);
-    lastSaveCap=saveCap;
     let mortExtraCap=Math.max(0, pool - extra);
     function applyCap(inputId, sliderId, capId, value, cap, label){
         let slider=document.getElementById(sliderId), input=document.getElementById(inputId), capEl=document.getElementById(capId);
@@ -919,11 +918,9 @@ function calculateAll(){
         buildMaxAffordColumn("30 Year",30,projected,numVal("mortgageRate"),maxCeiling,numVal("closingCostPercent"))
       + buildMaxAffordColumn("15 Year",15,projected,numVal("mortgageRate"),maxCeiling,numVal("closingCostPercent"));
     let leftoverNoteEl=document.getElementById("leftoverApplyNote");
-    if(leftover>0.5){
-        leftoverNoteEl.innerHTML=\`You have \${money(leftover)}/month left over. <button type="button" style="width:auto;display:inline;padding:6px 12px;font-size:12px;margin-left:6px;" onclick="applyLeftoverToSavings()">Apply to Savings</button>\`;
-    } else {
-        leftoverNoteEl.innerHTML="";
-    }
+    leftoverNoteEl.innerHTML = leftover>0.5
+        ? \`You have \${money(leftover)}/month unassigned - raise "Monthly Amount Set Aside for a House" above to put it toward the down payment.\`
+        : "";
 
     let price=numVal("homePrice"),rate=numVal("mortgageRate");
     let down=getDownPayment(price,projected);
@@ -1206,30 +1203,6 @@ window.toggleDownPayment=toggleDownPayment;
 window.onDownModeChange=onDownModeChange;
 window.toggleCustomTargets=toggleCustomTargets;
 window.onAffordModeChange=onAffordModeChange;
-window.acceptMaxAffordable=function(){
-    setMoney("monthlySave", lastSaveCap);
-    calculateAll();
-    showMsg(\`Set Monthly Amount Set Aside to \${money(lastSaveCap)} (your max affordable).\`);
-};
-window.applyLeftoverToSavings=function(){
-    if(lastLeftover>0.5){
-        let newAmt=numVal("monthlySave")+lastLeftover;
-        setMoney("monthlySave", newAmt);
-        calculateAll();
-        showMsg(\`Added \${money(lastLeftover)} leftover - Monthly Amount Set Aside is now \${money(newAmt)}.\`);
-    }
-};
-window.acceptTargetTimeline=function(){
-    let price=numVal("homePrice"), rate=numVal("mortgageRate");
-    let takeHome=getMonthlyTakeHome();
-    let saveYears=numVal("saveYears")||0;
-    let ceiling=takeHome*getTargetPaymentPct()/100;
-    let requiredDown=Math.max(price*getTargetDownPct()/100, requiredDownForPayment(price,rate,30,ceiling));
-    let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
-    setMoney("monthlySave", requiredMonthly);
-    calculateAll();
-    showMsg(\`Set Monthly Amount Set Aside to \${money(requiredMonthly)} to hit your \${saveYears}-year target.\`);
-};
 window.toggleDebtMode=toggleDebtMode;
 window.setDebtStrategy=setDebtStrategy;
 window.onSlider=onSlider;
@@ -1568,7 +1541,6 @@ export default function Dashboard() {
 <div id="maxAffordBlock">
 <div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
 <div class="compare" id="maxAffordResult" style="margin-top:10px;"></div>
-<button type="button" style="margin-top:10px;" onclick="acceptMaxAffordable()">Save the Max I Can Afford</button>
 <div class="hint" id="leftoverApplyNote" style="margin-top:10px;"></div>
 </div>
 
