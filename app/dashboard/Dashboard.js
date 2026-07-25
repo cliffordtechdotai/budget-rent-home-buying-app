@@ -1547,31 +1547,15 @@ export default function Dashboard() {
 <div id="customPriceBlock" style="display:none;">
 <div class="row2" style="margin-top:10px;">
 <div><label>Home Price</label><input id="homePrice" class="money" type="text" placeholder="$0"></div>
-<div>
-<label>Down Payment (type a $ amount or a %)<span class="info" title="Put down 20% or more and you skip PMI.">i</span></label>
-<div class="field-suffix">
-<div><input id="downPayment" class="money locked" type="text" placeholder="$0" readonly></div>
-<div><select id="downPaymentMode" onchange="onDownModeChange()"><option value="dollar">$</option><option value="percent">%</option></select></div>
+<div><label>Annual Rent Increase (%) <span class="info" title="How much your rent rises each year while you keep saving. It drives the 'rent paid while waiting' figure below.">i</span></label><input id="rentIncrease" type="number" placeholder="3" value="3"></div>
 </div>
-</div>
-</div>
-<div class="toggle-row">
-<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
-<label style="font-weight:normal;margin:0;">Use my projected savings balance as the down payment</label>
-</div>
-<div class="result-box" id="downResultBox" style="margin-top:6px;margin-bottom:16px;text-align:left;padding:14px 16px;">
-<div class="rb-sub num" id="downReadout" style="margin-top:0;"></div>
-</div>
-<div class="compare" id="compareResult"></div>
-
-<div class="row2" style="margin-top:16px;">
+<div class="row2">
 <div><label>Plan Start Date <span class="info" title="Everything counts forward from this date. It's saved automatically, so if you entered a test date before, it'll keep loading that instead of today until you change it or click Reset.">i</span></label><div class="field-suffix"><div><input id="startDate" type="date"></div><div><button type="button" style="padding:10px 8px;font-size:12px;" onclick="resetStartDateToToday()">Reset</button></div></div></div>
-<div><label>Current Monthly Rent</label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
+<div><label>Current Monthly Rent <span class="info" title="Mirrors your Rent / Housing expense so the cost of waiting always matches your budget.">i</span></label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
 </div>
-<div><label>Annual Rent Increase (%)</label><input id="rentIncrease" type="number" placeholder="3" value="3"></div>
 <div class="toggle-row">
 <input type="checkbox" id="customTargets" onchange="toggleCustomTargets()">
-<label style="font-weight:normal;margin:0;">Custom targets</label>
+<label style="font-weight:normal;margin:0;">Custom targets <span class="info" title="By default this requires 20% down (avoids PMI) and keeps the payment at or under 28% of take-home. Change those here.">i</span></label>
 </div>
 <div id="customTargetsBlock" style="display:none;">
 <div class="row2">
@@ -1580,11 +1564,36 @@ export default function Dashboard() {
 </div>
 </div>
 
-<div class="compare" id="optimalResult" style="margin-top:14px;"></div>
-<div class="writeup" id="optimalWriteup" style="font-size:14.5px;color:var(--ink);"></div>
+<div class="section-head">How long until you can afford it</div>
+<div class="hint" style="margin-bottom:8px;">At the savings pace you set in Down Payment Savings, keeping to your targets above.</div>
+<div class="compare" id="optimalResult"></div>
 <div class="verdict" id="optimalVerdict"></div>
 <div class="hint" id="gapNote" style="margin-top:12px;"></div>
 <div id="targetButtonsRow" style="display:flex;gap:10px;margin-top:10px;"></div>
+
+<div class="section-head">What the house costs at that point</div>
+<div class="hint" style="margin-bottom:8px;">Full monthly payment for this price, using the down payment below.</div>
+<div class="row2">
+<div>
+<label>Down Payment (type a $ amount or a %)<span class="info" title="Put down 20% or more and you skip PMI.">i</span></label>
+<div class="field-suffix">
+<div><input id="downPayment" class="money locked" type="text" placeholder="$0" readonly></div>
+<div><select id="downPaymentMode" onchange="onDownModeChange()"><option value="dollar">$</option><option value="percent">%</option></select></div>
+</div>
+</div>
+<div style="display:flex;align-items:flex-end;">
+<div class="toggle-row" style="margin-bottom:16px;">
+<input type="checkbox" id="useSavingsToggle" checked onchange="toggleDownPayment()">
+<label style="font-weight:normal;margin:0;">Use my projected savings balance</label>
+</div>
+</div>
+</div>
+<div class="result-box" id="downResultBox" style="margin-top:6px;margin-bottom:16px;text-align:left;padding:14px 16px;">
+<div class="rb-sub num" id="downReadout" style="margin-top:0;"></div>
+</div>
+<div class="compare" id="compareResult"></div>
+
+<div class="writeup" id="optimalWriteup" style="font-size:14.5px;color:var(--ink);"></div>
 <div class="hint" style="margin-top:12px;">Assumes today's price and rate hold steady.</div>
 </div>
 </div>

@@ -145,6 +145,8 @@ input.over { border-color:var(--bad); color:var(--bad); }
 .result-box .rb-label { font-size:11px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-faint); margin-top:3px; }
 .result-box .rb-sub { font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.5; }
 
+/* Names what the block of result cards underneath actually answers */
+.section-head { margin:22px 0 4px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink); padding-bottom:8px; border-bottom:1px solid var(--line); }
 .compare { display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; }
 .plan { flex:1 1 220px; background:var(--dark); color:#fff; border-radius:6px; padding:22px; }
 .plan h3 { margin:0 0 4px; text-align:center; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.12em; color:rgba(255,255,255,0.6); }
