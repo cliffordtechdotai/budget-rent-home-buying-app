@@ -941,6 +941,16 @@ function calculateAll(){
     document.getElementById("stageObligations").classList.toggle("needs-input", takeHome<=0);
     document.getElementById("stageHouse").classList.toggle("needs-input", takeHome<=0);
 
+    // Completion ticks. Debt and goals are both optional, so stage 2 counts as done once
+    // the budget above it is known - unless a debt is entered that can never be paid off,
+    // which is a real blocker worth surfacing.
+    let s1Done = takeHome>0 && expenses>0;
+    let s2Done = s1Done && !(anyDebt && debtFreeYears>MAX_SEARCH_YEARS);
+    let s3Done = s1Done && monthlySave>0 && max30>0;
+    document.getElementById("stageMoney").classList.toggle("is-complete", s1Done);
+    document.getElementById("stageObligations").classList.toggle("is-complete", s2Done);
+    document.getElementById("stageHouse").classList.toggle("is-complete", s3Done);
+
     saveToLocalStorage();
 }
 
@@ -995,7 +1005,9 @@ window.clearAll=function(){
 let savedFileHandle=null;
 function showMsg(t){ let el=document.getElementById("saveMsg"); el.textContent=t; setTimeout(()=>{ if(el.textContent===t) el.textContent=""; },4000); }
 window.saveAsFile=async function(){ let j=JSON.stringify(collectData(),null,2); if("showSaveFilePicker" in window){ try{ savedFileHandle=await window.showSaveFilePicker({suggestedName:"budget-dashboard-data.json",types:[{description:"JSON File",accept:{"application/json":[".json"]}}]}); let w=await savedFileHandle.createWritable(); await w.write(j); await w.close(); showMsg("Saved to file."); }catch(e){ if(e.name!=="AbortError") showMsg("Save failed: "+e.message); } } else { let b=new Blob([j],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a"); a.href=u; a.download="budget-dashboard-data.json"; a.click(); URL.revokeObjectURL(u); showMsg("Downloaded."); } };
-window.saveOverwrite=async function(){ if(!savedFileHandle) return window.saveAsFile(); try{ let w=await savedFileHandle.createWritable(); await w.write(JSON.stringify(collectData(),null,2)); await w.close(); showMsg("Overwrote saved file."); }catch(e){ showMsg("Overwrite failed: "+e.message); } };
+// The file handle lives only in memory - a page refresh clears it and the browser can't
+// hand it back without asking again, so this falls back to Save As and says so.
+window.saveOverwrite=async function(){ if(!savedFileHandle){ showMsg("No file picked yet this visit - choose where to save."); return window.saveAsFile(); } try{ let w=await savedFileHandle.createWritable(); await w.write(JSON.stringify(collectData(),null,2)); await w.close(); showMsg("Overwrote saved file."); }catch(e){ showMsg("Overwrite failed: "+e.message); } };
 window.loadFromFile=async function(){ if("showOpenFilePicker" in window){ try{ let [h]=await window.showOpenFilePicker({types:[{description:"JSON File",accept:{"application/json":[".json"]}}]}); savedFileHandle=h; let f=await h.getFile(); applyData(JSON.parse(await f.text())); showMsg("Loaded file."); }catch(e){ if(e.name!=="AbortError") showMsg("Load failed: "+e.message); } } else document.getElementById("fallbackFileInput").click(); };
 document.getElementById("fallbackFileInput").addEventListener("change",function(e){ let f=e.target.files[0]; if(!f) return; let r=new FileReader(); r.onload=ev=>{ applyData(JSON.parse(ev.target.result)); showMsg("Loaded file."); }; r.readAsText(f); });
 
@@ -1092,12 +1104,12 @@ export default function Dashboard() {
   return (
     <div dangerouslySetInnerHTML={{__html: `
       <h1>Home Buying Readiness Dashboard</h1>
-<p class="subtitle">See whether renting or buying makes sense, and how soon you'll be ready. Fill in each section top to bottom: income first, then spending, saving, debt, and the house.</p>
+<p class="subtitle">See whether renting or buying makes sense, and how soon you'll be ready. Work top to bottom in three steps: your money first, then debt and goals, then the house.</p>
 
 <div class="filebar">
-<button class="secondary" onclick="saveAsFile()">Save As...</button>
-<button class="secondary" onclick="saveOverwrite()">Overwrite Last Saved File</button>
-<button class="secondary" onclick="loadFromFile()">Load Saved File</button>
+<button class="secondary" onclick="saveAsFile()" title="Saves everything to a budget-dashboard-data.json file on your computer. Your entries are also kept automatically in this browser, but that copy is tied to this device only - use this for a real backup.">Save As...</button>
+<button class="secondary" onclick="saveOverwrite()" title="Writes back to the file you picked earlier in this visit. Refreshing the page makes the browser forget which file that was, so after a reload this asks you where to save again.">Overwrite Last Saved File</button>
+<button class="secondary" onclick="loadFromFile()" title="Loads a budget-dashboard-data.json file you saved earlier.">Load Saved File</button>
 <button class="secondary danger" onclick="clearAll()">Clear All</button>
 </div>
 <div class="saveMsg" id="saveMsg"></div>
@@ -1116,13 +1128,13 @@ export default function Dashboard() {
 
 <!-- STAGE 1: money in / money out -->
 <div class="stage" id="stageMoney">
-<h2 class="stage-header" onclick="toggleCollapse('stageMoney')">Your Money <span class="hdr-sum" id="stageMoneySum"></span><span class="chevron">⌄</span></h2>
+<h2 class="stage-header" onclick="toggleCollapse('stageMoney')"><span class="step">1</span>Your Money <span class="info hinfo" title="What comes in and what goes out. Everything further down is measured against what's left after these two, so this is the foundation for the whole plan.">i</span><span class="stage-check" id="stageMoneyCheck">✓</span><span class="hdr-sum" id="stageMoneySum"></span><span class="chevron">⌄</span></h2>
 <div class="stage-body">
 <div class="dashboard">
 
 <!-- 1 TAKE HOME -->
 <div class="card" id="takeHomeCard">
-<h2><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span></h2>
+<h2>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span></h2>
 <div class="collapse-body" id="takeHomeBody">
 <label>Household</label>
 <select id="householdType" onchange="onHouseholdTypeChange()">
@@ -1190,7 +1202,7 @@ export default function Dashboard() {
 
 <!-- 2 EXPENSES -->
 <div class="card" id="expensesCard">
-<h2><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span></h2>
+<h2>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span></h2>
 <div class="collapse-body" id="expensesBody">
 <label>Quick-Fill Preset</label>
 <select id="expensePreset" onchange="applyPreset()">
@@ -1228,13 +1240,13 @@ export default function Dashboard() {
 
 <!-- STAGE 2: what competes for the leftover (debt + other goals) -->
 <div class="stage" id="stageObligations">
-<h2 class="stage-header" onclick="toggleCollapse('stageObligations')">Obligations <span class="hdr-sum" id="stageObligationsSum"></span><span class="chevron">⌄</span></h2>
+<h2 class="stage-header" onclick="toggleCollapse('stageObligations')"><span class="step">2</span>Obligations <span class="info hinfo" title="Debt payments and other savings goals draw from the same leftover money as your house fund, so they're settled before the house budget. Both are optional - if you have neither, this stage is already satisfied.">i</span><span class="stage-check" id="stageObligationsCheck">✓</span><span class="hdr-sum" id="stageObligationsSum"></span><span class="chevron">⌄</span></h2>
 <div class="stage-body">
 <div class="dashboard">
 
 <!-- 3/4 DEBT + GOALS side by side (moved earlier - affect what's left over for house savings) -->
 <div class="card" id="debtCard">
-<h2><span class="step">3</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span></h2>
+<h2>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span></h2>
 <div class="collapse-body" id="debtBody">
 <div style="padding-top:4px;"></div>
 <div id="debtLumpBlock">
@@ -1280,7 +1292,7 @@ export default function Dashboard() {
 
 <!-- 4 GOALS (moved earlier) -->
 <div class="card" id="goalCard">
-<h2><span class="step">4</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span></h2>
+<h2>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span></h2>
 <div class="collapse-body" id="goalBody">
 <div style="padding-top:4px;"></div>
 <div id="goalList"></div>
@@ -1298,12 +1310,12 @@ export default function Dashboard() {
 
 <!-- STAGE 3: the house plan itself -->
 <div class="stage" id="stageHouse">
-<h2 class="stage-header" onclick="toggleCollapse('stageHouse')">House Plan <span class="hdr-sum" id="stageHouseSum"></span><span class="chevron">⌄</span></h2>
+<h2 class="stage-header" onclick="toggleCollapse('stageHouse')"><span class="step">3</span>House Plan <span class="info hinfo" title="How much you set aside each month, and what house that actually buys once escrow, PMI and closing costs are counted. Spends whatever is left after the two stages above.">i</span><span class="stage-check" id="stageHouseCheck">✓</span><span class="hdr-sum" id="stageHouseSum"></span><span class="chevron">⌄</span></h2>
 <div class="stage-body">
 <div class="dashboard">
 
 <div class="card" id="downSavingsCard">
-<h2><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
+<h2>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
 <div class="collapse-body" id="downSavingsBody">
 <label>Monthly Amount Set Aside for a House</label>
 <input id="monthlySave" class="money" type="text" placeholder="$0">
@@ -1328,7 +1340,7 @@ export default function Dashboard() {
 </div>
 
 <div class="card" id="mortgageSettingsCard">
-<h2><span class="step">6</span>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
+<h2>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
 <div class="collapse-body" id="mortgageSettingsBody">
 
 <label>What do you want to see? <span class="info" title="Max Home Price I Can Afford: shows the priciest home you can afford at your current Down Payment Savings pace (Section 5) and the affordability target below - no price entry needed. How Long For a Specific Price: type an exact home price and see the soonest you could responsibly buy it, plus what to change if it's out of reach.">i</span></label>
