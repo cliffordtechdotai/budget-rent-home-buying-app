@@ -745,6 +745,46 @@ function renderDebtSection(){
     return {debtSet,extra,anyDebt,baseMin,debtMonthly,perDebtOn,debtFreeYears,freedMonthly};
 }
 
+// ---- export ----
+// collectData() is a save format: raw field strings, meant to be reloaded. A report is
+// the opposite - the computed answers, labelled, for a human or a spreadsheet. Each row
+// carries both a display string and a raw number so a sheet can be read AND calculated on.
+let lastReport = [];
+function reportRow(section,item,display,amount){ return {section,item,display,amount}; }
+
+const CRLF=String.fromCharCode(13,10);
+function csvEscape(v){
+    let s = v===null||v===undefined ? "" : String(v);
+    return /[",]/.test(s)||s.indexOf(CRLF)>=0 ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+
+function buildReportCSV(){
+    let out=["Section,Item,Value,Amount"];
+    lastReport.forEach(r=>{
+        out.push([r.section,r.item,r.display,(r.amount===null||r.amount===undefined)?"":Math.round(r.amount*100)/100]
+            .map(csvEscape).join(","));
+    });
+    return out.join(CRLF);
+}
+
+function buildReportText(){
+    let out=["HOME BUYING READINESS PLAN","Generated "+fmtDate(new Date()),""];
+    let seen=null;
+    let width=Math.max(...lastReport.map(r=>r.item.length),10)+2;
+    lastReport.forEach(r=>{
+        if(r.section!==seen){ seen=r.section; out.push(""); out.push(r.section.toUpperCase()); out.push("-".repeat(r.section.length)); }
+        out.push("  "+r.item.padEnd(width)+r.display);
+    });
+    out.push("");
+    out.push("Estimates for planning only - not financial or tax advice.");
+    return out.join(CRLF);
+}
+
+function downloadFile(name, text, mime){
+    let b=new Blob([text],{type:mime}), u=URL.createObjectURL(b), a=document.createElement("a");
+    a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
+}
+
 // Main calculation
 function calculateAll(){
     let takeHome=getMonthlyTakeHome();
@@ -1005,6 +1045,78 @@ function calculateAll(){
     document.getElementById("stageObligations").classList.toggle("is-complete", s2Done);
     document.getElementById("stageHouse").classList.toggle("is-complete", s3Done);
 
+    // Snapshot the computed answers for CSV/text export. Built here so an export can
+    // never disagree with what's on screen - both come from this same pass.
+    lastReport=[];
+    let R=(sec,item,disp,amt)=>lastReport.push(reportRow(sec,item,disp,amt));
+    let ofTH=(x)=>takeHome>0?((x/takeHome)*100).toFixed(1)+"%":"—";
+    let rptRate=numVal("mortgageRate"), taxPct=numVal("taxMaintPercent"), closePct=numVal("closingCostPercent");
+
+    R("Income","Take-home per month",money(takeHome),takeHome);
+    if(document.getElementById("calcFromGross").checked){
+        let b=computeGrossBreakdown();
+        R("Income","Gross per year",money(b.gross),b.gross);
+        R("Income","Federal tax (est/yr)",money(b.fedTax),b.fedTax);
+        R("Income","FICA (est/yr)",money(b.fica),b.fica);
+        R("Income","State tax (est/yr)",money(b.stateTax),b.stateTax);
+    }
+
+    [["Rent / Housing","expRent"],["Utilities","expUtilities"],["Groceries","expGroceries"],
+     ["Gas / Transport","expGas"],["Insurance","expInsurance"],["Subscriptions","expSubs"],
+     ["Phone","expPhone"],["Other / Misc","expOther"]].forEach(pair=>{
+        let v=numVal(pair[1]); if(v>0) R("Expenses",pair[0],money(v),v);
+     });
+    R("Expenses","Total monthly expenses",money(expenses)+" ("+ofTH(expenses)+" of take-home)",expenses);
+
+    if(anyDebt){
+        let bal=debtSet.reduce((s,d)=>s+d.balance,0);
+        R("Debt","Total balance",money(bal),bal);
+        R("Debt","Monthly payment",money(debtMonthly),debtMonthly);
+        let stuck=debtFreeYears>MAX_SEARCH_YEARS;
+        R("Debt","Time to debt-free",stuck?"never at this payment":fmtMonths(Math.round(debtFreeYears*12)),stuck?null:Math.round(debtFreeYears*12));
+        if(!stuck) R("Debt","Debt-free date",fmtDate(addMonths(getStartDate(),Math.round(debtFreeYears*12))),null);
+    } else R("Debt","Total balance","none",0);
+
+    if(goalTotal>0) R("Goals","Total contributions / month",money(goalTotal),goalTotal);
+
+    R("Down Payment Savings","Set aside per month",money(monthlySave),monthlySave);
+    R("Down Payment Savings","Years saving",String(saveYears),saveYears);
+    R("Down Payment Savings","HYSA rate",numVal("hysaRate")+"%",numVal("hysaRate"));
+    R("Down Payment Savings","Projected balance",money(projected),projected);
+
+    R("Monthly Budget","Take-home",money(takeHome),takeHome);
+    R("Monthly Budget","Expenses",money(expenses),expenses);
+    R("Monthly Budget","House savings",money(monthlySave),monthlySave);
+    R("Monthly Budget","Debt payment",money(debtMonthly),debtMonthly);
+    R("Monthly Budget","Other goals",money(goalTotal),goalTotal);
+    R("Monthly Budget","Left over",money(leftover),leftover);
+
+    R("Mortgage Assumptions","Interest rate",rptRate+"%",rptRate);
+    R("Mortgage Assumptions","Tax + insurance + maint.",taxPct+"%/yr",taxPct);
+    R("Mortgage Assumptions","Closing costs",closePct+"% of price",closePct);
+    R("Mortgage Assumptions","Affordability target",getTargetPaymentPct()+"% of take-home",getTargetPaymentPct());
+
+    // report whichever mode is actually on screen
+    let scenarios = (customMode && price>0)
+        ? [{label:"House",p:price,d:down}]
+        : (max30>0 ? [{label:"Max Affordable",p:null,d:projected}] : []);
+    scenarios.forEach(sc=>{
+        [30,15].forEach(term=>{
+            let mp = sc.p!==null ? sc.p : maxAffordablePrice(projected,rptRate,term,maxCeiling);
+            let dn = sc.d;
+            let pi=calcMonthlyPayment(Math.max(0,mp-dn),rptRate,term);
+            let esc=monthlyTaxMaint(mp), pmi=monthlyPMI(mp,dn);
+            let sec=sc.label+" ("+term+"-year)";
+            R(sec,"Home price",money(mp),mp);
+            R(sec,"Down payment",money(dn)+(mp>0?" ("+((dn/mp)*100).toFixed(1)+"%)":""),dn);
+            R(sec,"Principal & interest",money(pi),pi);
+            R(sec,"Escrow (tax/ins/maint)",money(esc),esc);
+            R(sec,"PMI",pmi>0?money(pmi):"none (20%+ down)",pmi);
+            R(sec,"Total monthly payment",money(pi+esc+pmi),pi+esc+pmi);
+            R(sec,"Est. closing costs",money(mp*closePct/100),mp*closePct/100);
+        });
+    });
+
     saveToLocalStorage();
 }
 
@@ -1074,6 +1186,19 @@ window.applyPreset=applyPreset;
 // script runs inside an IIFE, and inline handlers resolve against global scope only.
 // calculateAll is wired directly to several checkboxes (Show PMI, Count escrow,
 // Be debt-free), so omitting it threw ReferenceError on click.
+// CSV opens directly in Google Sheets / Excel with no account, API key or upload -
+// the file never leaves the device, which keeps the privacy promise intact.
+window.exportCSV=function(){
+    if(!lastReport.length){ showMsg("Enter your numbers first."); return; }
+    downloadFile("home-buying-plan.csv", buildReportCSV(), "text/csv;charset=utf-8;");
+    showMsg("Downloaded CSV - open it in Sheets with File > Import.");
+};
+window.exportText=function(){
+    if(!lastReport.length){ showMsg("Enter your numbers first."); return; }
+    downloadFile("home-buying-plan.txt", buildReportText(), "text/plain;charset=utf-8;");
+    showMsg("Downloaded plain-text summary.");
+};
+
 window.calculateAll=calculateAll;
 window.toggleCollapse=toggleCollapse;
 window.toggleAllSections=toggleAllSections;
@@ -1169,6 +1294,8 @@ export default function Dashboard() {
 <button class="secondary" onclick="saveAsFile()" title="Saves everything to a budget-dashboard-data.json file on your computer. Your entries are also kept automatically in this browser, but that copy is tied to this device only - use this for a real backup.">Save As...</button>
 <button class="secondary" onclick="saveOverwrite()" title="Writes back to the file you picked earlier in this visit. Refreshing the page makes the browser forget which file that was, so after a reload this asks you where to save again.">Overwrite Last Saved File</button>
 <button class="secondary" onclick="loadFromFile()" title="Loads a budget-dashboard-data.json file you saved earlier.">Load Saved File</button>
+<button class="secondary" onclick="exportCSV()" title="Downloads your results as a .csv spreadsheet. Open it in Google Sheets (File > Import > Upload) or Excel. Includes a raw Amount column so you can build formulas on top of it.">Export Spreadsheet (CSV)</button>
+<button class="secondary" onclick="exportText()" title="Downloads a plain-text summary of your plan, laid out in labelled sections.">Export Summary (TXT)</button>
 <button class="secondary danger" onclick="clearAll()">Clear All</button>
 </div>
 <div class="saveMsg" id="saveMsg"></div>
