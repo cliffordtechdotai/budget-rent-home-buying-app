@@ -1,7 +1,7 @@
 {
   "name": "budget-rent-home-buying-app",
   "version": "1.0.0",
-  "description": "A free, privacy-first budgeting and house-planning calculator. Everything runs in the\r browser — no accounts, no server, no data leaves the user's machine. Plans can be saved\r to and loaded from a local file.",
+  "description": "A free, privacy-first budgeting and house-planning calculator. Everything runs in the browser — no accounts, no server, no data leaves the user's machine. Plans can be saved to and loaded from a local file.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -26,5 +26,9 @@
     "react-dom": "^19.2.8",
     "remark": "^15.0.1",
     "remark-html": "^16.0.1"
+  },
+  "overrides": {
+    "postcss": "^8.5.23",
+    "sharp": "^0.35.3"
   }
 }
