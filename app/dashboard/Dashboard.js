@@ -569,6 +569,106 @@ function addGoalRow(data){
 function readDebtRows(){ debtRows.forEach(r=>{ r.balance=parseMoney(document.getElementById(r.id+"_bal").value); r.rate=parseMoney(document.getElementById(r.id+"_rate").value); r.minPayment=parseMoney(document.getElementById(r.id+"_min").value); r.name=document.getElementById(r.id+"_name").value; }); }
 function removeRow(listName,id){ let list=listName==="debtRows"?debtRows:goalRows; let i=list.findIndex(r=>r.id===id); if(i>=0) list.splice(i,1); let el=document.getElementById(id); if(el) el.remove(); calculateAll(); }
 
+// Renders the "soonest you can responsibly buy" verdict, writeup, and gap buttons.
+// Split out of calculateAll: it is pure rendering, consumes values rather than
+// producing any, and was the single largest block in that function.
+function renderOptimalPlan(c){
+    const {takeHome,anyDebt,debtFreeYears,freedMonthly,debtMonthly,price,rate,inc,leftover,saveYears,monthlySave,maxCeiling,saveCap}=c;
+    let carryDebt=!document.getElementById("debtFreeFirst").checked;
+    let opts={ debtFreeYears:anyDebt?debtFreeYears:0, freedMonthly:anyDebt?freedMonthly:0, debtMonthlyDuringWait:anyDebt?debtMonthly:0, carryDebt, targetDownPct:getTargetDownPct(), targetPaymentPct:getTargetPaymentPct() };
+    document.getElementById("optimalResult").innerHTML=buildOptimalColumn("30 Year",30,price,rate,takeHome,inc,opts)+buildOptimalColumn("15 Year",15,price,rate,takeHome,inc,opts);
+    let r30=findOptimalYear(price,rate,30,takeHome,inc,opts);
+    let v=document.getElementById("optimalVerdict");
+    let w=document.getElementById("optimalWriteup");
+    let tgtDownPct=getTargetDownPct();
+    let tgtPayPct=getTargetPaymentPct();
+
+    let gapEl=document.getElementById("gapNote");
+    let btnRow=document.getElementById("targetButtonsRow");
+
+    if(price<=0){
+        v.textContent=""; v.className="verdict";
+        w.textContent="Enter a home price in the mortgage section above, and this will tell you the soonest you can responsibly buy.";
+        gapEl.innerHTML=""; btnRow.innerHTML="";
+    } else if(!r30){
+        v.textContent="Out of reach at current numbers."; v.className="verdict flag-bad";
+        w.innerHTML=\`With today's price, rate, and savings, you can't reach \${tgtDownPct}% down with a payment at or under \${tgtPayPct}% of take-home, even after decades. Lowering the price, saving more each month, a longer loan term, or loosening the targets under Custom would bring it within reach.\`;
+        gapEl.innerHTML=""; btnRow.innerHTML="";
+    } else {
+        let rentAmt=numVal("currentRent");
+        let buyMonths=Math.round(r30.year*12);
+        let parts=[];
+
+        if(r30.year===0||r30.paidOff){
+            v.textContent="You can responsibly buy now."; v.className="verdict flag-ok";
+        } else {
+            v.innerHTML=\`Soonest you can responsibly buy: <span style="color:var(--ink);">\${dateFromMonths(buyMonths)}</span>\`;
+            v.className="verdict";
+        }
+
+        parts.push(\`<b>Your targets:</b> at least <b>\${tgtDownPct}% down</b>\${tgtDownPct>=20?" (avoids PMI)":" (adds PMI until you reach 20% equity)"} and a payment at or under <b>\${tgtPayPct}%</b> of take-home.\`);
+
+        if(anyDebt && !carryDebt && debtFreeYears>0 && debtFreeYears<=MAX_SEARCH_YEARS){
+            let dMonths=Math.round(debtFreeYears*12);
+            parts.push(\`<b>Step 1, clear your debt.</b> Paying \${money(debtMonthly)}/month, you'd be debt-free around <b>\${dateFromMonths(dMonths)}</b>. After that, that \${money(debtMonthly)} rolls straight into your house savings, so the down payment grows faster.\`);
+        } else if(anyDebt && carryDebt){
+            parts.push(\`<b>You've chosen to buy while still carrying debt.</b> That's allowed, but the affordability check below counts your mortgage <i>and</i> your \${money(debtMonthly)}/month debt payment, so it takes a bigger down payment to qualify.\`);
+        }
+
+        if(r30.year===0||r30.paidOff){
+            parts.push(\`<b>You're already in range.</b> Buying now keeps your 30-year payment at or below \${tgtPayPct}% of take-home.\`);
+        } else {
+            let pmiNote = r30.pmi>0 ? \` That includes about \${money(r30.pmi)}/month of PMI, since you're under 20% down.\` : "";
+            parts.push(\`<b>Step \${anyDebt&&!carryDebt?"2":"1"}, save the down payment.</b> Keep renting while your down payment grows to about <b>\${money(r30.down)}</b> (\${tgtDownPct}% of the price). You'd hit the buy point around <b>\${dateFromMonths(buyMonths)}</b>, when a 30-year mortgage lands at \${money(r30.payment)}/month, <b>\${r30.percent.toFixed(1)}%</b> of take-home.\${pmiNote}\`);
+            let totalRent=rentPaidOverYears(r30.year);
+            parts.push(\`<b>The cost of waiting:</b> over those \${r30.year} year\${r30.year>1?"s":""} you'd pay about <b>\${money(totalRent)}</b> in rent at \${money(rentAmt)}/month. That's money spent, not saved. If rent is eating your budget, that's what's pushing the buy date out.\`);
+        }
+
+        if(leftover>0.5 && !(r30.year===0||r30.paidOff)){
+            let origSave=numVal("monthlySave");
+            let rFast=findOptimalYearWithSave(price,rate,30,takeHome,inc,opts,origSave+leftover);
+            if(rFast && rFast.year<r30.year){
+                let diff=r30.year-rFast.year;
+                parts.push(\`<b>You have \${money(leftover)}/month sitting unused.</b> If you slid all of it into house savings, you'd hit the buy point about <b>\${diff} year\${diff>1?"s":""} sooner</b>, around \${dateFromMonths(Math.round(rFast.year*12))}. Drag the Down Payment Savings slider up to put it to work.\`);
+            }
+        }
+
+        if(anyDebt && !carryDebt){
+            let optsCarry={ debtFreeYears, freedMonthly, debtMonthlyDuringWait:debtMonthly, carryDebt:true, targetDownPct:getTargetDownPct(), targetPaymentPct:getTargetPaymentPct() };
+            let rCarry=findOptimalYear(price,rate,30,takeHome,inc,optsCarry);
+            if(rCarry && rCarry.year<r30.year){
+                let diff=r30.year-rCarry.year;
+                parts.push(\`If you were willing to carry debt into the mortgage, you could buy about <b>\${diff} year\${diff>1?"s":""} sooner</b> (around \${dateFromMonths(Math.round(rCarry.year*12))}), but you'd be juggling both payments. Uncheck "Be debt-free before buying" above to model that.\`);
+            }
+        }
+
+        w.innerHTML=parts.join("<br><br>");
+
+        // gap analysis: does the actual soonest-year match the Years Saving the user
+        // originally typed in Section 5's Down Payment Savings?
+        if(r30.paidOff){
+            gapEl.innerHTML=""; btnRow.innerHTML="";
+        } else if(r30.year<=saveYears){
+            gapEl.innerHTML=\`<span class="flag-ok">You're on track - at this pace you'll be ready by your \${saveYears}-year target (actually \${dateFromMonths(buyMonths)}).</span>\`;
+            btnRow.innerHTML="";
+        } else {
+            let requiredDown=Math.max(price*tgtDownPct/100, requiredDownForPayment(price,rate,30,maxCeiling));
+            let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
+            let extraNeeded=requiredMonthly-monthlySave;
+            if(extraNeeded>0.5){
+                gapEl.innerHTML=\`At your current pace, this takes \${r30.year} years instead of your \${saveYears}-year target. To hit \${saveYears} years instead, you'd need to save about <b>\${money(requiredMonthly)}/mo</b> (\${money(extraNeeded)} more than now).\`;
+                let affordable=requiredMonthly<=saveCap;
+                btnRow.innerHTML=\`<button type="button" onclick="acceptMaxAffordable()">Save the Max I Can Afford</button>\`
+                  + (affordable
+                      ? \`<button type="button" onclick="acceptTargetTimeline()">Hit My \${saveYears}-Year Target</button>\`
+                      : \`<button type="button" disabled style="opacity:0.5;cursor:not-allowed;" title="That's more than you can currently afford (max \${money(saveCap)}/mo)">Hit My \${saveYears}-Year Target</button>\`);
+            } else {
+                gapEl.innerHTML=""; btnRow.innerHTML="";
+            }
+        }
+    }
+}
+
 // Main calculation
 function calculateAll(){
     let takeHome=getMonthlyTakeHome();
@@ -800,100 +900,7 @@ function calculateAll(){
     let inc=document.getElementById("includeTaxMaint").checked;
     document.getElementById("compareResult").innerHTML=buildPlanHTML("30 Year",price,down,rate,30,takeHome,closing,inc)+buildPlanHTML("15 Year",price,down,rate,15,takeHome,closing,inc);
 
-    let carryDebt=!document.getElementById("debtFreeFirst").checked;
-    let opts={ debtFreeYears:anyDebt?debtFreeYears:0, freedMonthly:anyDebt?freedMonthly:0, debtMonthlyDuringWait:anyDebt?debtMonthly:0, carryDebt, targetDownPct:getTargetDownPct(), targetPaymentPct:getTargetPaymentPct() };
-    document.getElementById("optimalResult").innerHTML=buildOptimalColumn("30 Year",30,price,rate,takeHome,inc,opts)+buildOptimalColumn("15 Year",15,price,rate,takeHome,inc,opts);
-
-    let r30=findOptimalYear(price,rate,30,takeHome,inc,opts);
-    let v=document.getElementById("optimalVerdict");
-    let w=document.getElementById("optimalWriteup");
-    let tgtDownPct=getTargetDownPct();
-    let tgtPayPct=getTargetPaymentPct();
-
-    let gapEl=document.getElementById("gapNote");
-    let btnRow=document.getElementById("targetButtonsRow");
-
-    if(price<=0){
-        v.textContent=""; v.className="verdict";
-        w.textContent="Enter a home price in the mortgage section above, and this will tell you the soonest you can responsibly buy.";
-        gapEl.innerHTML=""; btnRow.innerHTML="";
-    } else if(!r30){
-        v.textContent="Out of reach at current numbers."; v.className="verdict flag-bad";
-        w.innerHTML=\`With today's price, rate, and savings, you can't reach \${tgtDownPct}% down with a payment at or under \${tgtPayPct}% of take-home, even after decades. Lowering the price, saving more each month, a longer loan term, or loosening the targets under Custom would bring it within reach.\`;
-        gapEl.innerHTML=""; btnRow.innerHTML="";
-    } else {
-        let rentAmt=numVal("currentRent");
-        let buyMonths=Math.round(r30.year*12);
-        let parts=[];
-
-        if(r30.year===0||r30.paidOff){
-            v.textContent="You can responsibly buy now."; v.className="verdict flag-ok";
-        } else {
-            v.innerHTML=\`Soonest you can responsibly buy: <span style="color:var(--ink);">\${dateFromMonths(buyMonths)}</span>\`;
-            v.className="verdict";
-        }
-
-        parts.push(\`<b>Your targets:</b> at least <b>\${tgtDownPct}% down</b>\${tgtDownPct>=20?" (avoids PMI)":" (adds PMI until you reach 20% equity)"} and a payment at or under <b>\${tgtPayPct}%</b> of take-home.\`);
-
-        if(anyDebt && !carryDebt && debtFreeYears>0 && debtFreeYears<=MAX_SEARCH_YEARS){
-            let dMonths=Math.round(debtFreeYears*12);
-            parts.push(\`<b>Step 1, clear your debt.</b> Paying \${money(debtMonthly)}/month, you'd be debt-free around <b>\${dateFromMonths(dMonths)}</b>. After that, that \${money(debtMonthly)} rolls straight into your house savings, so the down payment grows faster.\`);
-        } else if(anyDebt && carryDebt){
-            parts.push(\`<b>You've chosen to buy while still carrying debt.</b> That's allowed, but the affordability check below counts your mortgage <i>and</i> your \${money(debtMonthly)}/month debt payment, so it takes a bigger down payment to qualify.\`);
-        }
-
-        if(r30.year===0||r30.paidOff){
-            parts.push(\`<b>You're already in range.</b> Buying now keeps your 30-year payment at or below \${tgtPayPct}% of take-home.\`);
-        } else {
-            let pmiNote = r30.pmi>0 ? \` That includes about \${money(r30.pmi)}/month of PMI, since you're under 20% down.\` : "";
-            parts.push(\`<b>Step \${anyDebt&&!carryDebt?"2":"1"}, save the down payment.</b> Keep renting while your down payment grows to about <b>\${money(r30.down)}</b> (\${tgtDownPct}% of the price). You'd hit the buy point around <b>\${dateFromMonths(buyMonths)}</b>, when a 30-year mortgage lands at \${money(r30.payment)}/month, <b>\${r30.percent.toFixed(1)}%</b> of take-home.\${pmiNote}\`);
-            let totalRent=rentPaidOverYears(r30.year);
-            parts.push(\`<b>The cost of waiting:</b> over those \${r30.year} year\${r30.year>1?"s":""} you'd pay about <b>\${money(totalRent)}</b> in rent at \${money(rentAmt)}/month. That's money spent, not saved. If rent is eating your budget, that's what's pushing the buy date out.\`);
-        }
-
-        if(leftover>0.5 && !(r30.year===0||r30.paidOff)){
-            let origSave=numVal("monthlySave");
-            let rFast=findOptimalYearWithSave(price,rate,30,takeHome,inc,opts,origSave+leftover);
-            if(rFast && rFast.year<r30.year){
-                let diff=r30.year-rFast.year;
-                parts.push(\`<b>You have \${money(leftover)}/month sitting unused.</b> If you slid all of it into house savings, you'd hit the buy point about <b>\${diff} year\${diff>1?"s":""} sooner</b>, around \${dateFromMonths(Math.round(rFast.year*12))}. Drag the Down Payment Savings slider up to put it to work.\`);
-            }
-        }
-
-        if(anyDebt && !carryDebt){
-            let optsCarry={ debtFreeYears, freedMonthly, debtMonthlyDuringWait:debtMonthly, carryDebt:true, targetDownPct:getTargetDownPct(), targetPaymentPct:getTargetPaymentPct() };
-            let rCarry=findOptimalYear(price,rate,30,takeHome,inc,optsCarry);
-            if(rCarry && rCarry.year<r30.year){
-                let diff=r30.year-rCarry.year;
-                parts.push(\`If you were willing to carry debt into the mortgage, you could buy about <b>\${diff} year\${diff>1?"s":""} sooner</b> (around \${dateFromMonths(Math.round(rCarry.year*12))}), but you'd be juggling both payments. Uncheck "Be debt-free before buying" above to model that.\`);
-            }
-        }
-
-        w.innerHTML=parts.join("<br><br>");
-
-        // gap analysis: does the actual soonest-year match the Years Saving the user
-        // originally typed in Section 5's Down Payment Savings?
-        if(r30.paidOff){
-            gapEl.innerHTML=""; btnRow.innerHTML="";
-        } else if(r30.year<=saveYears){
-            gapEl.innerHTML=\`<span class="flag-ok">You're on track - at this pace you'll be ready by your \${saveYears}-year target (actually \${dateFromMonths(buyMonths)}).</span>\`;
-            btnRow.innerHTML="";
-        } else {
-            let requiredDown=Math.max(price*tgtDownPct/100, requiredDownForPayment(price,rate,30,maxCeiling));
-            let requiredMonthly=requiredMonthlySavingsForTarget(requiredDown, saveYears);
-            let extraNeeded=requiredMonthly-monthlySave;
-            if(extraNeeded>0.5){
-                gapEl.innerHTML=\`At your current pace, this takes \${r30.year} years instead of your \${saveYears}-year target. To hit \${saveYears} years instead, you'd need to save about <b>\${money(requiredMonthly)}/mo</b> (\${money(extraNeeded)} more than now).\`;
-                let affordable=requiredMonthly<=saveCap;
-                btnRow.innerHTML=\`<button type="button" onclick="acceptMaxAffordable()">Save the Max I Can Afford</button>\`
-                  + (affordable
-                      ? \`<button type="button" onclick="acceptTargetTimeline()">Hit My \${saveYears}-Year Target</button>\`
-                      : \`<button type="button" disabled style="opacity:0.5;cursor:not-allowed;" title="That's more than you can currently afford (max \${money(saveCap)}/mo)">Hit My \${saveYears}-Year Target</button>\`);
-            } else {
-                gapEl.innerHTML=""; btnRow.innerHTML="";
-            }
-        }
-    }
+    renderOptimalPlan({takeHome,anyDebt,debtFreeYears,freedMonthly,debtMonthly,price,rate,inc,leftover,saveYears,monthlySave,maxCeiling,saveCap});
 
     let loanAmt=Math.max(0, price-down);
     function payoffCol(label, term){
