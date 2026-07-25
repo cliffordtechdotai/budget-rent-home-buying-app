@@ -283,10 +283,6 @@ function simulateDebtPayoffDetailed(rows, extra, strategy){
     return {months,empty:false,interest:Math.round(totalInterest),perDebt};
 }
 
-function simulateDebtPayoff(rows, extra, strategy){
-    let r=simulateDebtPayoffDetailed(rows, extra, strategy);
-    return {months:r.months, empty:r.empty, interest:r.interest, stuck:r.stuck};
-}
 
 function totalMinPayments(set){ return set.reduce((s,d)=>s+d.minPayment,0); }
 
@@ -1058,6 +1054,11 @@ window.onHouseholdTypeChange=onHouseholdTypeChange;
 window.onIncomeModeChange=onIncomeModeChange;
 window.onJointIncomeModeChange=onJointIncomeModeChange;
 window.applyPreset=applyPreset;
+// Everything reachable from an inline on*= attribute must live on window: the whole
+// script runs inside an IIFE, and inline handlers resolve against global scope only.
+// calculateAll is wired directly to several checkboxes (Show PMI, Count escrow,
+// Be debt-free), so omitting it threw ReferenceError on click.
+window.calculateAll=calculateAll;
 window.toggleCollapse=toggleCollapse;
 window.toggleAllSections=toggleAllSections;
 window.toggleDownPayment=toggleDownPayment;
