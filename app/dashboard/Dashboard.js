@@ -746,6 +746,48 @@ function renderDebtSection(){
     return {debtSet,extra,anyDebt,baseMin,debtMonthly,perDebtOn,debtFreeYears,freedMonthly};
 }
 
+// ---- scenarios ----
+// Only things the market decides move here: what savings earn, what a mortgage costs,
+// and what tax/insurance/upkeep run. Income, expenses and how much you set aside are
+// left exactly as entered - the point is "same budget, different conditions", not the
+// app second-guessing choices the user deliberately made.
+// Offsets are relative to whatever the user typed, so a hand-entered 7% mortgage rate
+// still gets a sensible spread rather than being overwritten by a hardcoded guess.
+const SCENARIOS = [
+    {key:"conservative", label:"Conservative", hysaAdj:-1.0, rateAdj:+1.0, escrowMult:1.35,
+     note:"Savings earn less, borrowing costs more, and tax/insurance run high."},
+    {key:"average",      label:"Average",      hysaAdj:0,    rateAdj:0,    escrowMult:1,
+     note:"Exactly the numbers you entered - this matches the result above."},
+    {key:"optimistic",   label:"Optimistic",   hysaAdj:+1.5, rateAdj:-1.0, escrowMult:0.75,
+     note:"Savings earn more, borrowing is cheaper, and tax/insurance come in low."}
+];
+
+// Re-runs the projection and the max-price search under one scenario's assumptions.
+// Mirrors the live path exactly, but with rates passed in rather than read from inputs.
+function projectScenario(sc, ctx){
+    let hysa=Math.max(0, ctx.hysaPct+sc.hysaAdj);
+    let mRate=Math.max(0.01, ctx.mortgageRate+sc.rateAdj);
+    let escrowPct=Math.max(0, ctx.taxMaintPct*sc.escrowMult);
+
+    // same compounding as baseSavingsAtYear / savingsWithDebtPlan, at the scenario rate
+    let bal=ctx.existingInHysa?ctx.existing:0, months=Math.round(ctx.saveYears*12);
+    let dfm=Math.round(ctx.debtFreeYears*12), sr=hysa/100/12;
+    for(let i=0;i<months;i++){
+        let contrib=ctx.monthlySave + ((ctx.rollover && i>=dfm)?ctx.freedMonthly:0);
+        bal=(bal+contrib)*(1+sr);
+    }
+    if(!ctx.existingInHysa) bal+=ctx.existing;
+
+    // max price under this scenario's rate and escrow, same binary search as the live one
+    let lo=bal, hi=Math.max(bal*10,2000000);
+    for(let i=0;i<60;i++){
+        let mid=(lo+hi)/2, loan=Math.max(0,mid-bal);
+        let pay=calcMonthlyPayment(loan,mRate,30)+mid*(escrowPct/100)/12+monthlyPMI(mid,bal);
+        if(pay<=ctx.ceiling) lo=mid; else hi=mid;
+    }
+    return {hysa, mRate, escrowPct, projected:bal, maxPrice:lo};
+}
+
 // Pay the debt down faster, or put the money in savings? Simulates one split of the
 // spare money and reports both the payoff date and the down payment you end up with.
 // Savings that ignore an unpaid balance are fiction, so leftover debt is netted out.
@@ -1064,6 +1106,32 @@ function calculateAll(){
     leftoverNoteEl.innerHTML = leftover>0.5
         ? \`You have \${money(leftover)}/month unassigned - raise "Monthly Amount Set Aside for a House" above to put it toward the down payment.\`
         : "";
+
+    // ---- scenario strip: same budget under different market conditions ----
+    let scEl=document.getElementById("scenarioStrip");
+    if(scEl){
+        if(takeHome<=0 || monthlySave<=0){
+            scEl.innerHTML="";
+        } else {
+            let ctx={ hysaPct:numVal("hysaRate"), mortgageRate:numVal("mortgageRate"),
+                taxMaintPct:numVal("taxMaintPercent"), saveYears, monthlySave,
+                existing:numVal("existingSavings"), existingInHysa:document.getElementById("existingInHysa").checked,
+                rollover:(anyDebt && debtFreeFirst), debtFreeYears:anyDebt?debtFreeYears:0,
+                freedMonthly:anyDebt?freedMonthly:0, ceiling:maxCeiling };
+            let cells=SCENARIOS.map(sc=>{
+                let r=projectScenario(sc,ctx);
+                let isAvg=sc.key==="average";
+                let tip=sc.note+" HYSA "+r.hysa.toFixed(1)+"%, mortgage "+r.mRate.toFixed(1)+"%, tax/ins/maint "+r.escrowPct.toFixed(2)+"%/yr.";
+                return '<div class="scen'+(isAvg?' scen-avg':'')+'" title="'+tip+'">'
+                    +'<div class="scen-label">'+sc.label+'</div>'
+                    +'<div class="scen-val num">'+money(r.maxPrice)+'</div>'
+                    +'<div class="scen-sub num">'+money(r.projected)+' saved &middot; '+r.mRate.toFixed(1)+'%</div></div>';
+            }).join("");
+            scEl.innerHTML='<div class="scen-head">Same budget, different conditions '
+                +'<span class="info" title="Only what the market decides changes here - what your savings earn, what a mortgage costs, and what tax/insurance/upkeep run. Your income, expenses and monthly savings stay exactly as you entered them. Average is the result shown above.">i</span></div>'
+                +'<div class="scen-row">'+cells+'</div>';
+        }
+    }
 
     let price=numVal("homePrice"),rate=numVal("mortgageRate");
     let down=getDownPayment(price,projected);
@@ -1641,6 +1709,7 @@ export default function Dashboard() {
 <div id="maxAffordBlock">
 <div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
 <div class="compare" id="maxAffordResult" style="margin-top:10px;"></div>
+<div id="scenarioStrip"></div>
 <div class="hint" id="leftoverApplyNote" style="margin-top:10px;"></div>
 </div>
 
