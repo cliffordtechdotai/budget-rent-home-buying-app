@@ -26,7 +26,7 @@ const STATE_RATES = {
 };
 
 const MONEY_IDS = ["yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","grossJoint","monthlyIncomeOverride","monthlySave","existingSavings","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","lumpBalance","lumpPayment","debtExtra","mortExtra","homePrice"];
-const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct"];
+const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct","affordModeSelect"];
 
 // Every collapsible section, in page order. Cards that share a row with a sibling are
 // NOT in here on purpose: their stage owns the collapse. A collapsed card sitting beside
@@ -35,6 +35,7 @@ const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyInc
 // cards that own their row collapse.
 const COLLAPSIBLE_IDS = ["stageMoney","stageObligations","stageHouse","mortgageResultsCard","customPayoffCard","overviewCard"];
 
+const DEFAULT_STATE = "PA";
 const THRESHOLD = 28;
 const MAX_SEARCH_YEARS = 40;
 const MIN_PAYMENT_PCT = 0.025;
@@ -71,11 +72,24 @@ function formatMoneyField(el){
 }
 function setMoney(id,v){ let el=document.getElementById(id); if(el) el.value="$"+Math.round(v).toLocaleString("en-US"); }
 
+// Idempotent on purpose: React Strict Mode runs this init twice in dev, and appending
+// without clearing produced a duplicated 102-entry state list.
 function populateStateSelect(){
     let sel=document.getElementById("stateSelect");
+    if(!sel) return;
+    let prev=sel.value;
+    sel.innerHTML="";
     Object.keys(STATE_RATES).sort((a,b)=>STATE_RATES[a].name.localeCompare(STATE_RATES[b].name)).forEach(c=>{
         let o=document.createElement("option"); o.value=c; o.textContent=STATE_RATES[c].name; sel.appendChild(o);
-    }); sel.value="PA";
+    });
+    sel.value = STATE_RATES[prev] ? prev : DEFAULT_STATE;
+}
+
+// A select whose value isn't one of its options renders blank, which silently drops the
+// state tax to 0%. Called after any restore to make sure that can't stick.
+function ensureValidState(){
+    let sel=document.getElementById("stateSelect");
+    if(sel && !STATE_RATES[sel.value]) sel.value=DEFAULT_STATE;
 }
 
 function applyPreset(){ let p=document.getElementById("expensePreset").value; if(p==="custom"){ ["expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther"].forEach(k=>{let el=document.getElementById(k); if(el) el.value="";}); calculateAll(); return; } let v=PRESETS[p]; for(let k in v) setMoney(k,v[k]); calculateAll(); }
@@ -1006,7 +1020,7 @@ function applyData(data){
     if(data.__debtStrategy) setDebtStrategy(data.__debtStrategy);
     // tolerant of older saves that only recorded debtCard/goalCard
     if(data.__collapsed){ COLLAPSIBLE_IDS.forEach(id=>{ let el=document.getElementById(id); if(el && (id in data.__collapsed)) el.classList.toggle("collapsed",data.__collapsed[id]); }); }
-    updateHouseholdVisibility(); toggleDownPayment(); toggleDebtMode(); toggleCustomTargets(); calculateAll();
+    ensureValidState(); updateHouseholdVisibility(); onAffordModeChange(); toggleDownPayment(); toggleDebtMode(); toggleCustomTargets(); calculateAll();
 }
 function saveToLocalStorage(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(collectData())); }catch(e){} }
 function loadFromLocalStorage(){ try{ let r=localStorage.getItem(STORAGE_KEY); if(r){ applyData(JSON.parse(r)); return true; } }catch(e){} return false; }
@@ -1016,7 +1030,7 @@ window.clearAll=function(){
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
     FLAT_FIELD_IDS.forEach(id=>{ let el=document.getElementById(id); if(!el) return;
         if(el.type==="checkbox"){ el.checked=(id==="existingInHysa"||id==="useSavingsToggle"||id==="debtFreeFirst"); }
-        else if(el.tagName==="SELECT"){ if(id==="householdType") el.value="single"; else if(id==="expensePreset") el.value="custom"; else if(id==="downPaymentMode") el.value="dollar"; else if(id==="stateSelect") el.value="PA"; }
+        else if(el.tagName==="SELECT"){ if(id==="householdType") el.value="single"; else if(id==="expensePreset") el.value="custom"; else if(id==="downPaymentMode") el.value="dollar"; else if(id==="stateSelect") el.value=DEFAULT_STATE; else if(id==="affordModeSelect") el.value="max"; }
         else if(id==="startDate"){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
         else el.value="";
     });
