@@ -815,6 +815,150 @@ function downloadFile(name, text, mime){
     a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
 }
 
+// Accelerated-payoff what-if plus the milestone timeline. Pure rendering: consumes
+// the finished mortgage numbers and produces nothing the pipeline needs.
+function renderCustomPayoff(c){
+    const {price,down,rate,mortExtra,anyDebt,debtFreeYears}=c;
+    let loanAmt=Math.max(0, price-down);
+    function payoffCol(label, term){
+        let baseMonths=payoffMonthsWithExtra(loanAmt,rate,term,0);
+        let fastMonths=payoffMonthsWithExtra(loanAmt,rate,term,mortExtra);
+        let basePay=calcMonthlyPayment(loanAmt,rate,term);
+        let baseInterest=basePay*term*12-loanAmt;
+        let fastInterest=fastMonths!==null?((basePay+mortExtra)*fastMonths-loanAmt):0;
+        let saved=baseInterest-fastInterest;
+        return \`<div class="plan"><h3>\${label} + Extra</h3>
+            <div class="big">\${fmtMonths(fastMonths)}</div>
+            <div class="summary-line"><span>Normal payoff</span><span>\${fmtMonths(baseMonths)}</span></div>
+            <div class="summary-line"><span>Monthly payment</span><span>\${money(basePay+mortExtra)}</span></div>
+            <div class="summary-line"><span>Interest saved</span><span class="flag-ok">\${mortExtra>0?money(Math.max(0,saved)):"$0"}</span></div></div>\`;
+    }
+    if(loanAmt>0){
+        document.getElementById("customPayoffResult").innerHTML=payoffCol("30 Year",30)+payoffCol("15 Year",15);
+    } else {
+        document.getElementById("customPayoffResult").innerHTML=\`<div class="plan"><h3>—</h3><div style="text-align:center;font-size:13px;color:rgba(255,255,255,0.7);">Enter a home price and down payment above to model an accelerated payoff.</div></div>\`;
+    }
+
+    let mile=[];
+    if(anyDebt && debtFreeYears<=MAX_SEARCH_YEARS){ mile.push(\`Debt-free: \${dateFromMonths(Math.round(debtFreeYears*12))}\`); }
+    goalRows.filter(g=>g.amount>0).forEach(g=>{ mile.push(\`\${g.name||"Goal"} funded: \${dateFromMonths(Math.round(g.years*12))}\`); });
+    if(loanAmt>0){ let fm=payoffMonthsWithExtra(loanAmt,rate,30,mortExtra); mile.push(\`House paid off: \${dateFromMonths(fm)}\${mortExtra>0?\` (with \${money(mortExtra)}/mo extra)\`:" on a 30-year loan"}\`); }
+    document.getElementById("milestoneWriteup").innerHTML = mile.length ? "<b>Your milestones</b><br>" + mile.join("<br>") : "Add debt, goals, or a home price to see your milestone timeline.";
+}
+
+// Fills the Monthly Overview stat grid and its where-it-all-goes breakdown.
+// Returns mortExtra and leftover because later steps (slider caps, the optimal plan,
+// and the debt-vs-save comparison) all depend on them.
+function renderOverviewStats(c){
+    const {takeHome,expenses,monthlySave,debtMonthly,goalTotal}=c;
+    let mortExtra=numVal("mortExtra");
+    let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal-mortExtra;
+    document.getElementById("incomeStat").textContent=money(takeHome);
+    document.getElementById("expenseStat").textContent=money(expenses);
+    document.getElementById("saveStat").textContent=money(monthlySave);
+    document.getElementById("debtStat").textContent=money(debtMonthly);
+    document.getElementById("goalStat").textContent=money(goalTotal);
+    let lo=document.getElementById("leftoverStat"); lo.textContent=money(leftover); lo.className="big num "+(leftover<0?"flag-bad":"flag-ok");
+    let pctOf=(x)=> takeHome>0 ? ((x/takeHome)*100).toFixed(1)+"%" : "—";
+    document.getElementById("expenseStatPct").textContent=pctOf(expenses);
+    document.getElementById("saveStatPct").textContent=pctOf(monthlySave);
+    document.getElementById("debtStatPct").textContent=pctOf(debtMonthly);
+    document.getElementById("goalStatPct").textContent=pctOf(goalTotal);
+    let loPctEl=document.getElementById("leftoverStatPct");
+    loPctEl.textContent=pctOf(leftover);
+    loPctEl.className="subpct "+(leftover<0?"flag-bad":"");
+
+    let incLabel = document.getElementById("calcFromGross").checked ? "take-home (after tax)" : "take-home";
+    let bd=[\`\${money(takeHome)} \${incLabel}\`];
+    if(expenses>0) bd.push(\`− \${money(expenses)} expenses\`);
+    if(monthlySave>0) bd.push(\`− \${money(monthlySave)} house savings\`);
+    if(debtMonthly>0) bd.push(\`− \${money(debtMonthly)} debt payment\`);
+    if(goalTotal>0) bd.push(\`− \${money(goalTotal)} goals\`);
+    if(mortExtra>0) bd.push(\`− \${money(mortExtra)} extra to mortgage\`);
+    bd.push(\`= \${money(leftover)} left over\`);
+    let breakdownText=bd.join("  ");
+    let noteEl=document.getElementById("overviewNote");
+    noteEl.innerHTML = (leftover<0
+        ? \`<span class="flag-bad">You're over budget by \${money(-leftover)}. Trim expenses or lower a target.</span>\`
+        : \`Left over is money not yet assigned. Slide it into savings, debt, or extra mortgage payments to put it to work.\`)
+        + \` <span class="info" title="\${breakdownText}">i</span>\`;
+    return {mortExtra,leftover};
+}
+
+// Header summaries, sticky bar, and the trust checks that drive the stage ticks.
+// Returns max30 and customMode, which the CSV/text export snapshot also needs.
+function renderSummaries(c){
+    const {takeHome,expenses,anyDebt,debtFreeYears,goalTotal,monthlySave,saveYears,projected,leftover,mortExtra,price,rate,maxCeiling,perDebtOn,debtSet}=c;
+    // ---- header summaries + sticky bar ----
+    // Every collapsible header carries its own headline number, so collapsing a section
+    // hides the inputs but never hides the answer.
+    let setSum=(id,txt)=>{ let el=document.getElementById(id); if(el) el.textContent=txt||""; };
+    let debtSummary = !anyDebt ? "No debt"
+        : (debtFreeYears>MAX_SEARCH_YEARS ? "Payment too low"
+        : fmtMonths(Math.round(debtFreeYears*12))+" to debt-free");
+    let max30 = takeHome>0 ? maxAffordablePrice(projected,rate,30,maxCeiling) : 0;
+
+    setSum("mortgageResultsSum", document.getElementById("affordModeSelect").value==="max"
+        ? (max30>0 ? "up to "+money(max30) : "")
+        : (price>0 ? money(price) : ""));
+    setSum("customPayoffSum", mortExtra>0 ? "+"+money(mortExtra)+"/mo extra" : "");
+    setSum("overviewSum", takeHome>0 ? money(leftover)+" left over" : "");
+
+    // ---- trust checks ----
+    // A tick means "this number can be relied on", not "these fields aren't empty".
+    // The traps below all produce a confident but badly wrong answer rather than an
+    // error, which is the dangerous kind of wrong for someone planning around it.
+    // A field left untouched reads as "" while a deliberate 0 reads as "0", so a real
+    // 0%-promo debt is never mistaken for a neglected one.
+    let isUntouched=(id)=>{ let el=document.getElementById(id); return !el || String(el.value).trim()===""; };
+    let debtRateMissing = anyDebt && (perDebtOn
+        ? debtRows.some(r=>r.balance>0 && isUntouched(r.id+"_rate"))
+        : isUntouched("lumpRate"));
+    // a blank/zero mortgage rate silently prices the loan as interest-free
+    let mortgageRateMissing = isUntouched("mortgageRate") || numVal("mortgageRate")<=0;
+    let customMode = document.getElementById("affordModeSelect").value==="custom";
+
+    let warnMoney = takeHome<=0 ? "enter your take-home pay"
+        : (expenses<=0 ? "add your monthly expenses" : null);
+    let warnObligations = !anyDebt ? null
+        : (debtFreeYears>MAX_SEARCH_YEARS ? "payment too low to pay this off"
+        : (debtRateMissing ? "add an interest rate" : null));
+    let warnHouse = takeHome<=0 ? "needs take-home pay"
+        : (mortgageRateMissing ? "add a mortgage rate"
+        : (monthlySave<=0 ? "set a monthly savings amount"
+        : (customMode && price<=0 ? "enter a home price" : null)));
+
+    let setStageSum=(id,warning,normal)=>{
+        let el=document.getElementById(id); if(!el) return;
+        el.textContent = warning ? "⚠ "+warning : normal;
+        el.classList.toggle("warn", !!warning);
+    };
+    setStageSum("stageMoneySum", warnMoney, money(takeHome)+" in · "+money(expenses)+" out");
+    setStageSum("stageObligationsSum", warnObligations, debtSummary+(goalTotal>0?" · "+money(goalTotal)+"/mo goals":""));
+    setStageSum("stageHouseSum", warnHouse, (monthlySave>0?money(projected)+" saved · ":"")+(max30>0?"up to "+money(max30):""));
+
+    document.getElementById("sbTakeHome").textContent = takeHome>0 ? money(takeHome) : "$0";
+    let sbLo=document.getElementById("sbLeftover");
+    sbLo.textContent = money(leftover);
+    sbLo.className = "sb-val num "+(leftover<0?"flag-bad":(takeHome>0?"flag-ok":""));
+    document.getElementById("sbMaxPrice").textContent = max30>0 ? money(max30) : "—";
+
+    // Guided state: dim the later stages until the numbers they depend on exist
+    document.getElementById("stageObligations").classList.toggle("needs-input", takeHome<=0);
+    document.getElementById("stageHouse").classList.toggle("needs-input", takeHome<=0);
+
+    // Completion ticks ride on the same trust checks as the warnings above, so a tick and
+    // a warning can never disagree. Debt and goals stay optional: having neither is a
+    // complete answer, it just has to be a trustworthy one.
+    let s1Done = !warnMoney;
+    let s2Done = s1Done && !warnObligations;
+    let s3Done = s1Done && !warnHouse && max30>0;
+    document.getElementById("stageMoney").classList.toggle("is-complete", s1Done);
+    document.getElementById("stageObligations").classList.toggle("is-complete", s2Done);
+    document.getElementById("stageHouse").classList.toggle("is-complete", s3Done);
+    return {max30,customMode};
+}
+
 // Main calculation
 function calculateAll(){
     let takeHome=getMonthlyTakeHome();
@@ -884,37 +1028,7 @@ function calculateAll(){
     let goalTotal=totalGoalMonthly();
     document.getElementById("goalTotalResult").textContent=money(goalTotal);
 
-    let mortExtra=numVal("mortExtra");
-    let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal-mortExtra;
-    document.getElementById("incomeStat").textContent=money(takeHome);
-    document.getElementById("expenseStat").textContent=money(expenses);
-    document.getElementById("saveStat").textContent=money(monthlySave);
-    document.getElementById("debtStat").textContent=money(debtMonthly);
-    document.getElementById("goalStat").textContent=money(goalTotal);
-    let lo=document.getElementById("leftoverStat"); lo.textContent=money(leftover); lo.className="big num "+(leftover<0?"flag-bad":"flag-ok");
-    let pctOf=(x)=> takeHome>0 ? ((x/takeHome)*100).toFixed(1)+"%" : "—";
-    document.getElementById("expenseStatPct").textContent=pctOf(expenses);
-    document.getElementById("saveStatPct").textContent=pctOf(monthlySave);
-    document.getElementById("debtStatPct").textContent=pctOf(debtMonthly);
-    document.getElementById("goalStatPct").textContent=pctOf(goalTotal);
-    let loPctEl=document.getElementById("leftoverStatPct");
-    loPctEl.textContent=pctOf(leftover);
-    loPctEl.className="subpct "+(leftover<0?"flag-bad":"");
-
-    let incLabel = document.getElementById("calcFromGross").checked ? "take-home (after tax)" : "take-home";
-    let bd=[\`\${money(takeHome)} \${incLabel}\`];
-    if(expenses>0) bd.push(\`− \${money(expenses)} expenses\`);
-    if(monthlySave>0) bd.push(\`− \${money(monthlySave)} house savings\`);
-    if(debtMonthly>0) bd.push(\`− \${money(debtMonthly)} debt payment\`);
-    if(goalTotal>0) bd.push(\`− \${money(goalTotal)} goals\`);
-    if(mortExtra>0) bd.push(\`− \${money(mortExtra)} extra to mortgage\`);
-    bd.push(\`= \${money(leftover)} left over\`);
-    let breakdownText=bd.join("  ");
-    let noteEl=document.getElementById("overviewNote");
-    noteEl.innerHTML = (leftover<0
-        ? \`<span class="flag-bad">You're over budget by \${money(-leftover)}. Trim expenses or lower a target.</span>\`
-        : \`Left over is money not yet assigned. Slide it into savings, debt, or extra mortgage payments to put it to work.\`)
-        + \` <span class="info" title="\${breakdownText}">i</span>\`;
+    const {mortExtra,leftover}=renderOverviewStats({takeHome,expenses,monthlySave,debtMonthly,goalTotal});
 
     // Debt payoff gets priority over house savings: debt extra draws from the full pool
     // first, and house savings only gets whatever's left over after that.
@@ -977,99 +1091,9 @@ function calculateAll(){
 
     renderOptimalPlan({takeHome,anyDebt,debtFreeYears,freedMonthly,debtMonthly,price,rate,inc,leftover,saveYears,monthlySave,maxCeiling,saveCap});
 
-    let loanAmt=Math.max(0, price-down);
-    function payoffCol(label, term){
-        let baseMonths=payoffMonthsWithExtra(loanAmt,rate,term,0);
-        let fastMonths=payoffMonthsWithExtra(loanAmt,rate,term,mortExtra);
-        let basePay=calcMonthlyPayment(loanAmt,rate,term);
-        let baseInterest=basePay*term*12-loanAmt;
-        let fastInterest=fastMonths!==null?((basePay+mortExtra)*fastMonths-loanAmt):0;
-        let saved=baseInterest-fastInterest;
-        return \`<div class="plan"><h3>\${label} + Extra</h3>
-            <div class="big">\${fmtMonths(fastMonths)}</div>
-            <div class="summary-line"><span>Normal payoff</span><span>\${fmtMonths(baseMonths)}</span></div>
-            <div class="summary-line"><span>Monthly payment</span><span>\${money(basePay+mortExtra)}</span></div>
-            <div class="summary-line"><span>Interest saved</span><span class="flag-ok">\${mortExtra>0?money(Math.max(0,saved)):"$0"}</span></div></div>\`;
-    }
-    if(loanAmt>0){
-        document.getElementById("customPayoffResult").innerHTML=payoffCol("30 Year",30)+payoffCol("15 Year",15);
-    } else {
-        document.getElementById("customPayoffResult").innerHTML=\`<div class="plan"><h3>—</h3><div style="text-align:center;font-size:13px;color:rgba(255,255,255,0.7);">Enter a home price and down payment above to model an accelerated payoff.</div></div>\`;
-    }
+    renderCustomPayoff({price,down,rate,mortExtra,anyDebt,debtFreeYears});
 
-    let mile=[];
-    if(anyDebt && debtFreeYears<=MAX_SEARCH_YEARS){ mile.push(\`Debt-free: \${dateFromMonths(Math.round(debtFreeYears*12))}\`); }
-    goalRows.filter(g=>g.amount>0).forEach(g=>{ mile.push(\`\${g.name||"Goal"} funded: \${dateFromMonths(Math.round(g.years*12))}\`); });
-    if(loanAmt>0){ let fm=payoffMonthsWithExtra(loanAmt,rate,30,mortExtra); mile.push(\`House paid off: \${dateFromMonths(fm)}\${mortExtra>0?\` (with \${money(mortExtra)}/mo extra)\`:" on a 30-year loan"}\`); }
-    document.getElementById("milestoneWriteup").innerHTML = mile.length ? "<b>Your milestones</b><br>" + mile.join("<br>") : "Add debt, goals, or a home price to see your milestone timeline.";
-
-    // ---- header summaries + sticky bar ----
-    // Every collapsible header carries its own headline number, so collapsing a section
-    // hides the inputs but never hides the answer.
-    let setSum=(id,txt)=>{ let el=document.getElementById(id); if(el) el.textContent=txt||""; };
-    let debtSummary = !anyDebt ? "No debt"
-        : (debtFreeYears>MAX_SEARCH_YEARS ? "Payment too low"
-        : fmtMonths(Math.round(debtFreeYears*12))+" to debt-free");
-    let max30 = takeHome>0 ? maxAffordablePrice(projected,rate,30,maxCeiling) : 0;
-
-    setSum("mortgageResultsSum", document.getElementById("affordModeSelect").value==="max"
-        ? (max30>0 ? "up to "+money(max30) : "")
-        : (price>0 ? money(price) : ""));
-    setSum("customPayoffSum", mortExtra>0 ? "+"+money(mortExtra)+"/mo extra" : "");
-    setSum("overviewSum", takeHome>0 ? money(leftover)+" left over" : "");
-
-    // ---- trust checks ----
-    // A tick means "this number can be relied on", not "these fields aren't empty".
-    // The traps below all produce a confident but badly wrong answer rather than an
-    // error, which is the dangerous kind of wrong for someone planning around it.
-    // A field left untouched reads as "" while a deliberate 0 reads as "0", so a real
-    // 0%-promo debt is never mistaken for a neglected one.
-    let isUntouched=(id)=>{ let el=document.getElementById(id); return !el || String(el.value).trim()===""; };
-    let debtRateMissing = anyDebt && (perDebtOn
-        ? debtRows.some(r=>r.balance>0 && isUntouched(r.id+"_rate"))
-        : isUntouched("lumpRate"));
-    // a blank/zero mortgage rate silently prices the loan as interest-free
-    let mortgageRateMissing = isUntouched("mortgageRate") || numVal("mortgageRate")<=0;
-    let customMode = document.getElementById("affordModeSelect").value==="custom";
-
-    let warnMoney = takeHome<=0 ? "enter your take-home pay"
-        : (expenses<=0 ? "add your monthly expenses" : null);
-    let warnObligations = !anyDebt ? null
-        : (debtFreeYears>MAX_SEARCH_YEARS ? "payment too low to pay this off"
-        : (debtRateMissing ? "add an interest rate" : null));
-    let warnHouse = takeHome<=0 ? "needs take-home pay"
-        : (mortgageRateMissing ? "add a mortgage rate"
-        : (monthlySave<=0 ? "set a monthly savings amount"
-        : (customMode && price<=0 ? "enter a home price" : null)));
-
-    let setStageSum=(id,warning,normal)=>{
-        let el=document.getElementById(id); if(!el) return;
-        el.textContent = warning ? "⚠ "+warning : normal;
-        el.classList.toggle("warn", !!warning);
-    };
-    setStageSum("stageMoneySum", warnMoney, money(takeHome)+" in · "+money(expenses)+" out");
-    setStageSum("stageObligationsSum", warnObligations, debtSummary+(goalTotal>0?" · "+money(goalTotal)+"/mo goals":""));
-    setStageSum("stageHouseSum", warnHouse, (monthlySave>0?money(projected)+" saved · ":"")+(max30>0?"up to "+money(max30):""));
-
-    document.getElementById("sbTakeHome").textContent = takeHome>0 ? money(takeHome) : "$0";
-    let sbLo=document.getElementById("sbLeftover");
-    sbLo.textContent = money(leftover);
-    sbLo.className = "sb-val num "+(leftover<0?"flag-bad":(takeHome>0?"flag-ok":""));
-    document.getElementById("sbMaxPrice").textContent = max30>0 ? money(max30) : "—";
-
-    // Guided state: dim the later stages until the numbers they depend on exist
-    document.getElementById("stageObligations").classList.toggle("needs-input", takeHome<=0);
-    document.getElementById("stageHouse").classList.toggle("needs-input", takeHome<=0);
-
-    // Completion ticks ride on the same trust checks as the warnings above, so a tick and
-    // a warning can never disagree. Debt and goals stay optional: having neither is a
-    // complete answer, it just has to be a trustworthy one.
-    let s1Done = !warnMoney;
-    let s2Done = s1Done && !warnObligations;
-    let s3Done = s1Done && !warnHouse && max30>0;
-    document.getElementById("stageMoney").classList.toggle("is-complete", s1Done);
-    document.getElementById("stageObligations").classList.toggle("is-complete", s2Done);
-    document.getElementById("stageHouse").classList.toggle("is-complete", s3Done);
+    const {max30,customMode}=renderSummaries({takeHome,expenses,anyDebt,debtFreeYears,goalTotal,monthlySave,saveYears,projected,leftover,mortExtra,price,rate,maxCeiling,perDebtOn,debtSet});
 
     // ---- pay debt down faster, or save it? ----
     // The honest rule is just debt rate vs savings rate, but people want to see it in
