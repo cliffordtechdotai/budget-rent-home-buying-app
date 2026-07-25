@@ -56,6 +56,8 @@ h1 { text-align:center; font-size:30px; font-weight:700; letter-spacing:-0.025em
 
 /* Live summary shown in a collapsed card/stage header, so collapsing keeps the key number visible */
 .hdr-sum { margin-left:auto; font-size:11px; font-weight:500; text-transform:none; letter-spacing:0.01em; color:var(--ink-faint); font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* something in this stage would produce a confidently wrong number */
+.hdr-sum.warn { color:var(--warn); font-weight:600; }
 .card h2.collapsible .hdr-sum + .chevron { margin-left:10px; }
 
 /* Stage = a labelled group of cards (Your Money / Obligations / House Plan).

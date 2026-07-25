@@ -926,10 +926,38 @@ function calculateAll(){
     setSum("customPayoffSum", mortExtra>0 ? "+"+money(mortExtra)+"/mo extra" : "");
     setSum("overviewSum", takeHome>0 ? money(leftover)+" left over" : "");
 
-    setSum("stageMoneySum", takeHome>0 ? money(takeHome)+" in · "+money(expenses)+" out" : "start here");
-    setSum("stageObligationsSum", takeHome>0 ? debtSummary+(goalTotal>0?" · "+money(goalTotal)+"/mo goals":"") : "needs take-home pay");
-    setSum("stageHouseSum", takeHome<=0 ? "needs take-home pay"
-        : (monthlySave>0 ? money(projected)+" saved · " : "")+(max30>0?"up to "+money(max30):""));
+    // ---- trust checks ----
+    // A tick means "this number can be relied on", not "these fields aren't empty".
+    // The traps below all produce a confident but badly wrong answer rather than an
+    // error, which is the dangerous kind of wrong for someone planning around it.
+    // A field left untouched reads as "" while a deliberate 0 reads as "0", so a real
+    // 0%-promo debt is never mistaken for a neglected one.
+    let isUntouched=(id)=>{ let el=document.getElementById(id); return !el || String(el.value).trim()===""; };
+    let debtRateMissing = anyDebt && (perDebtOn
+        ? debtRows.some(r=>r.balance>0 && isUntouched(r.id+"_rate"))
+        : isUntouched("lumpRate"));
+    // a blank/zero mortgage rate silently prices the loan as interest-free
+    let mortgageRateMissing = isUntouched("mortgageRate") || numVal("mortgageRate")<=0;
+    let customMode = document.getElementById("affordModeSelect").value==="custom";
+
+    let warnMoney = takeHome<=0 ? "enter your take-home pay"
+        : (expenses<=0 ? "add your monthly expenses" : null);
+    let warnObligations = !anyDebt ? null
+        : (debtFreeYears>MAX_SEARCH_YEARS ? "payment too low to pay this off"
+        : (debtRateMissing ? "add an interest rate" : null));
+    let warnHouse = takeHome<=0 ? "needs take-home pay"
+        : (mortgageRateMissing ? "add a mortgage rate"
+        : (monthlySave<=0 ? "set a monthly savings amount"
+        : (customMode && price<=0 ? "enter a home price" : null)));
+
+    let setStageSum=(id,warning,normal)=>{
+        let el=document.getElementById(id); if(!el) return;
+        el.textContent = warning ? "⚠ "+warning : normal;
+        el.classList.toggle("warn", !!warning);
+    };
+    setStageSum("stageMoneySum", warnMoney, money(takeHome)+" in · "+money(expenses)+" out");
+    setStageSum("stageObligationsSum", warnObligations, debtSummary+(goalTotal>0?" · "+money(goalTotal)+"/mo goals":""));
+    setStageSum("stageHouseSum", warnHouse, (monthlySave>0?money(projected)+" saved · ":"")+(max30>0?"up to "+money(max30):""));
 
     document.getElementById("sbTakeHome").textContent = takeHome>0 ? money(takeHome) : "$0";
     let sbLo=document.getElementById("sbLeftover");
@@ -941,12 +969,12 @@ function calculateAll(){
     document.getElementById("stageObligations").classList.toggle("needs-input", takeHome<=0);
     document.getElementById("stageHouse").classList.toggle("needs-input", takeHome<=0);
 
-    // Completion ticks. Debt and goals are both optional, so stage 2 counts as done once
-    // the budget above it is known - unless a debt is entered that can never be paid off,
-    // which is a real blocker worth surfacing.
-    let s1Done = takeHome>0 && expenses>0;
-    let s2Done = s1Done && !(anyDebt && debtFreeYears>MAX_SEARCH_YEARS);
-    let s3Done = s1Done && monthlySave>0 && max30>0;
+    // Completion ticks ride on the same trust checks as the warnings above, so a tick and
+    // a warning can never disagree. Debt and goals stay optional: having neither is a
+    // complete answer, it just has to be a trustworthy one.
+    let s1Done = !warnMoney;
+    let s2Done = s1Done && !warnObligations;
+    let s3Done = s1Done && !warnHouse && max30>0;
     document.getElementById("stageMoney").classList.toggle("is-complete", s1Done);
     document.getElementById("stageObligations").classList.toggle("is-complete", s2Done);
     document.getElementById("stageHouse").classList.toggle("is-complete", s3Done);
