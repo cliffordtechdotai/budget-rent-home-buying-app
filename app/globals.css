@@ -54,6 +54,33 @@ h1 { text-align:center; font-size:30px; font-weight:700; letter-spacing:-0.025em
 .collapse-body { overflow:hidden; transition:max-height 0.28s ease, opacity 0.2s ease; }
 .card.collapsed .collapse-body { max-height:0 !important; opacity:0; }
 
+/* Live summary shown in a collapsed card/stage header, so collapsing keeps the key number visible */
+.hdr-sum { margin-left:auto; font-size:11px; font-weight:500; text-transform:none; letter-spacing:0.01em; color:var(--ink-faint); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.card h2.collapsible .hdr-sum + .chevron { margin-left:10px; }
+
+/* Stage = a labelled group of cards (Your Money / Obligations / House Plan).
+   Uses its own .stage-body class rather than .collapse-body so nesting a
+   collapsed card inside a stage can never collide with the card rules above. */
+.stage { margin-bottom:22px; }
+.stage-header { display:flex; align-items:center; margin:0; padding:14px 20px; background:var(--paper); border:1px solid var(--line); border-radius:6px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:var(--ink); cursor:pointer; user-select:none; transition:opacity 0.2s ease; }
+.stage-header:hover { border-color:var(--line-strong); }
+.stage-header .chevron { margin-left:10px; font-size:15px; transition:transform 0.22s ease; color:var(--ink-faint); font-weight:400; }
+.stage.collapsed .stage-header .chevron { transform:rotate(-90deg); }
+.stage-body { overflow:hidden; padding-top:16px; transition:max-height 0.3s ease, opacity 0.2s ease, padding-top 0.2s ease; }
+.stage.collapsed > .stage-body { max-height:0 !important; opacity:0; padding-top:0; }
+/* Guided empty state: de-emphasise stages whose inputs aren't ready yet (visual only, still fully usable) */
+.stage.needs-input > .stage-header { opacity:0.6; }
+.stage.needs-input > .stage-header .hdr-sum { color:var(--warn); }
+
+/* Always-visible headline numbers that follow you while scrolling */
+.summary-bar { position:sticky; top:8px; z-index:60; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:4px 26px; margin:0 0 22px; padding:11px 18px; background:rgba(255,255,255,0.93); backdrop-filter:blur(8px); border:1px solid var(--line-strong); border-radius:6px; }
+.sb-item { display:flex; align-items:baseline; gap:7px; }
+.sb-label { font-size:10px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-faint); }
+.sb-val { font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+.bulkbar { display:flex; justify-content:center; gap:8px; margin-bottom:18px; }
+.bulkbar button { width:auto; padding:7px 14px; font-size:12px; font-weight:500; background:transparent; color:var(--ink-soft); border:1px solid var(--line); }
+.bulkbar button:hover { background:var(--ink); color:#fff; border-color:var(--ink); opacity:1; }
+
 label { font-weight:500; font-size:12px; letter-spacing:0.01em; color:var(--ink-soft); display:block; }
 input,select { width:100%; padding:10px 12px; margin-top:5px; margin-bottom:16px; font-size:15px; font-family:var(--font); box-sizing:border-box; border:1px solid var(--line-strong); border-radius:4px; background:#fff; color:var(--ink); transition:border-color 0.12s ease; }
 input:focus,select:focus { outline:none; border-color:var(--ink); }

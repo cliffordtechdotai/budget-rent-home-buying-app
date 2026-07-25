@@ -28,6 +28,10 @@ const STATE_RATES = {
 const MONEY_IDS = ["yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","grossJoint","monthlyIncomeOverride","monthlySave","existingSavings","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","lumpBalance","lumpPayment","debtExtra","mortExtra","homePrice"];
 const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct"];
 
+// Every collapsible section (stage groups + individual cards), in page order.
+// Drives Expand/Collapse All and the saved open/closed state.
+const COLLAPSIBLE_IDS = ["stageMoney","takeHomeCard","expensesCard","stageObligations","debtCard","goalCard","stageHouse","downSavingsCard","mortgageSettingsCard","mortgageResultsCard","customPayoffCard","overviewCard"];
+
 const THRESHOLD = 28;
 const MAX_SEARCH_YEARS = 40;
 const MIN_PAYMENT_PCT = 0.025;
@@ -73,7 +77,12 @@ function populateStateSelect(){
 
 function applyPreset(){ let p=document.getElementById("expensePreset").value; if(p==="custom"){ ["expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther"].forEach(k=>{let el=document.getElementById(k); if(el) el.value="";}); calculateAll(); return; } let v=PRESETS[p]; for(let k in v) setMoney(k,v[k]); calculateAll(); }
 
-function toggleCollapse(id){ document.getElementById(id).classList.toggle("collapsed"); }
+function toggleCollapse(id){ document.getElementById(id).classList.toggle("collapsed"); saveToLocalStorage(); }
+
+function toggleAllSections(expand){
+    COLLAPSIBLE_IDS.forEach(id=>{ let el=document.getElementById(id); if(el) el.classList.toggle("collapsed", !expand); });
+    saveToLocalStorage();
+}
 
 function toggleDownPayment(){
     let u=document.getElementById("useSavingsToggle").checked;
@@ -899,6 +908,41 @@ function calculateAll(){
     if(loanAmt>0){ let fm=payoffMonthsWithExtra(loanAmt,rate,30,mortExtra); mile.push(\`House paid off: \${dateFromMonths(fm)}\${mortExtra>0?\` (with \${money(mortExtra)}/mo extra)\`:" on a 30-year loan"}\`); }
     document.getElementById("milestoneWriteup").innerHTML = mile.length ? "<b>Your milestones</b><br>" + mile.join("<br>") : "Add debt, goals, or a home price to see your milestone timeline.";
 
+    // ---- header summaries + sticky bar ----
+    // Every collapsible header carries its own headline number, so collapsing a section
+    // hides the inputs but never hides the answer.
+    let setSum=(id,txt)=>{ let el=document.getElementById(id); if(el) el.textContent=txt||""; };
+    let debtSummary = !anyDebt ? "No debt"
+        : (debtFreeYears>MAX_SEARCH_YEARS ? "Payment too low"
+        : fmtMonths(Math.round(debtFreeYears*12))+" to debt-free");
+    let max30 = takeHome>0 ? maxAffordablePrice(projected,rate,30,maxCeiling) : 0;
+
+    setSum("takeHomeSum", takeHome>0 ? money(takeHome)+"/mo" : "");
+    setSum("expensesSum", expenses>0 ? money(expenses)+"/mo" : "");
+    setSum("debtSum", debtSummary);
+    setSum("goalSum", goalTotal>0 ? money(goalTotal)+"/mo" : "none");
+    setSum("downSavingsSum", monthlySave>0 ? money(projected)+" in "+saveYears+"yr" : "");
+    setSum("mortgageSettingsSum", numVal("mortgageRate")+"% · "+getTargetPaymentPct()+"% target");
+    setSum("mortgageResultsSum", document.getElementById("affordModeSelect").value==="max"
+        ? (max30>0 ? "up to "+money(max30) : "")
+        : (price>0 ? money(price) : ""));
+    setSum("customPayoffSum", mortExtra>0 ? "+"+money(mortExtra)+"/mo extra" : "");
+    setSum("overviewSum", takeHome>0 ? money(leftover)+" left over" : "");
+
+    setSum("stageMoneySum", takeHome>0 ? money(takeHome)+" in · "+money(expenses)+" out" : "start here");
+    setSum("stageObligationsSum", takeHome>0 ? debtSummary+(goalTotal>0?" · "+money(goalTotal)+"/mo goals":"") : "needs take-home pay");
+    setSum("stageHouseSum", takeHome>0 ? (max30>0?"up to "+money(max30):"") : "needs take-home pay");
+
+    document.getElementById("sbTakeHome").textContent = takeHome>0 ? money(takeHome) : "$0";
+    let sbLo=document.getElementById("sbLeftover");
+    sbLo.textContent = money(leftover);
+    sbLo.className = "sb-val num "+(leftover<0?"flag-bad":(takeHome>0?"flag-ok":""));
+    document.getElementById("sbMaxPrice").textContent = max30>0 ? money(max30) : "—";
+
+    // Guided state: dim the later stages until the numbers they depend on exist
+    document.getElementById("stageObligations").classList.toggle("needs-input", takeHome<=0);
+    document.getElementById("stageHouse").classList.toggle("needs-input", takeHome<=0);
+
     saveToLocalStorage();
 }
 
@@ -911,7 +955,8 @@ function collectData(){
     data.__goalRows=goalRows.map(r=>({name:r.name,amount:r.amount,years:r.years,rate:r.rate}));
     data.__debtStrategy=debtStrategy;
     data.__lumpPaymentEdited=lumpPaymentEdited;
-    data.__collapsed={debtCard:document.getElementById("debtCard").classList.contains("collapsed"),goalCard:document.getElementById("goalCard").classList.contains("collapsed")};
+    data.__collapsed={};
+    COLLAPSIBLE_IDS.forEach(id=>{ let el=document.getElementById(id); if(el) data.__collapsed[id]=el.classList.contains("collapsed"); });
     return data;
 }
 function applyData(data){
@@ -923,7 +968,8 @@ function applyData(data){
     if(data.__debtRows) data.__debtRows.forEach(r=>addDebtRow(r));
     if(data.__goalRows) data.__goalRows.forEach(r=>addGoalRow(r));
     if(data.__debtStrategy) setDebtStrategy(data.__debtStrategy);
-    if(data.__collapsed){ document.getElementById("debtCard").classList.toggle("collapsed",data.__collapsed.debtCard); document.getElementById("goalCard").classList.toggle("collapsed",data.__collapsed.goalCard); }
+    // tolerant of older saves that only recorded debtCard/goalCard
+    if(data.__collapsed){ COLLAPSIBLE_IDS.forEach(id=>{ let el=document.getElementById(id); if(el && (id in data.__collapsed)) el.classList.toggle("collapsed",data.__collapsed[id]); }); }
     updateHouseholdVisibility(); toggleDownPayment(); toggleDebtMode(); toggleCustomTargets(); calculateAll();
 }
 function saveToLocalStorage(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(collectData())); }catch(e){} }
@@ -960,6 +1006,7 @@ window.onIncomeModeChange=onIncomeModeChange;
 window.onJointIncomeModeChange=onJointIncomeModeChange;
 window.applyPreset=applyPreset;
 window.toggleCollapse=toggleCollapse;
+window.toggleAllSections=toggleAllSections;
 window.toggleDownPayment=toggleDownPayment;
 window.onDownModeChange=onDownModeChange;
 window.toggleCustomTargets=toggleCustomTargets;
@@ -1011,7 +1058,13 @@ populateStateSelect();
 setDebtStrategy("even");
 (function(){ let el=document.getElementById("startDate"); if(el && !el.value){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); } })();
 let loaded=loadFromLocalStorage();
-if(!loaded){ toggleDebtMode(); }
+if(!loaded){
+    toggleDebtMode();
+    // Guided first run: open only the first stage so there's one obvious starting point
+    // instead of a full page of empty fields. Once anything is saved, the user's own
+    // open/closed state is restored instead.
+    ["stageObligations","stageHouse"].forEach(id=>document.getElementById(id).classList.add("collapsed"));
+}
 (function(){ let el=document.getElementById("startDate"); if(el && !el.value){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); } })();
 toggleDownPayment();
 toggleCustomTargets();
@@ -1051,11 +1104,26 @@ export default function Dashboard() {
 <div class="saveMsg" id="saveMsg"></div>
 <input type="file" id="fallbackFileInput" accept=".json" style="display:none;">
 
+<div class="summary-bar" id="summaryBar">
+<div class="sb-item"><span class="sb-label">Take-Home</span><span class="sb-val num" id="sbTakeHome">$0</span></div>
+<div class="sb-item"><span class="sb-label">Left Over</span><span class="sb-val num" id="sbLeftover">$0</span></div>
+<div class="sb-item"><span class="sb-label">Max Home Price</span><span class="sb-val num" id="sbMaxPrice">—</span></div>
+</div>
+
+<div class="bulkbar">
+<button type="button" onclick="toggleAllSections(true)">Expand All</button>
+<button type="button" onclick="toggleAllSections(false)">Collapse All</button>
+</div>
+
+<!-- STAGE 1: money in / money out -->
+<div class="stage" id="stageMoney">
+<h2 class="stage-header" onclick="toggleCollapse('stageMoney')">Your Money <span class="hdr-sum" id="stageMoneySum"></span><span class="chevron">⌄</span></h2>
+<div class="stage-body">
 <div class="dashboard">
 
 <!-- 1 TAKE HOME -->
 <div class="card" id="takeHomeCard">
-<h2 class="collapsible" onclick="toggleCollapse('takeHomeCard')"><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('takeHomeCard')"><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span><span class="hdr-sum" id="takeHomeSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="takeHomeBody">
 <label>Household</label>
 <select id="householdType" onchange="onHouseholdTypeChange()">
@@ -1123,7 +1191,7 @@ export default function Dashboard() {
 
 <!-- 2 EXPENSES -->
 <div class="card" id="expensesCard">
-<h2 class="collapsible" onclick="toggleCollapse('expensesCard')"><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('expensesCard')"><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span><span class="hdr-sum" id="expensesSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="expensesBody">
 <label>Quick-Fill Preset</label>
 <select id="expensePreset" onchange="applyPreset()">
@@ -1155,9 +1223,19 @@ export default function Dashboard() {
 </div>
 </div>
 
+</div>
+</div>
+</div>
+
+<!-- STAGE 2: what competes for the leftover (debt + other goals) -->
+<div class="stage" id="stageObligations">
+<h2 class="stage-header" onclick="toggleCollapse('stageObligations')">Obligations <span class="hdr-sum" id="stageObligationsSum"></span><span class="chevron">⌄</span></h2>
+<div class="stage-body">
+<div class="dashboard">
+
 <!-- 3/4 DEBT + GOALS side by side (moved earlier - affect what's left over for house savings) -->
 <div class="card collapsed" id="debtCard">
-<h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">3</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">3</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="hdr-sum" id="debtSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="debtBody">
 <div style="padding-top:4px;"></div>
 <div id="debtLumpBlock">
@@ -1203,7 +1281,7 @@ export default function Dashboard() {
 
 <!-- 4 GOALS (moved earlier) -->
 <div class="card collapsed" id="goalCard">
-<h2 class="collapsible" onclick="toggleCollapse('goalCard')"><span class="step">4</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('goalCard')"><span class="step">4</span>Other Savings Goals <span class="info hinfo" title="Other things you're saving toward (college, a car, a trip).">i</span><span class="hdr-sum" id="goalSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="goalBody">
 <div style="padding-top:4px;"></div>
 <div id="goalList"></div>
@@ -1215,13 +1293,18 @@ export default function Dashboard() {
 </div>
 </div>
 
-<!-- 5 DOWN PAYMENT SAVINGS moved into row 2, paired side-by-side with card 6 below -->
+</div>
+</div>
 </div>
 
-<div class="dashboard" style="margin-top:20px;">
+<!-- STAGE 3: the house plan itself -->
+<div class="stage" id="stageHouse">
+<h2 class="stage-header" onclick="toggleCollapse('stageHouse')">House Plan <span class="hdr-sum" id="stageHouseSum"></span><span class="chevron">⌄</span></h2>
+<div class="stage-body">
+<div class="dashboard">
 
 <div class="card" id="downSavingsCard">
-<h2 class="collapsible" onclick="toggleCollapse('downSavingsCard')"><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('downSavingsCard')"><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span><span class="hdr-sum" id="downSavingsSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="downSavingsBody">
 <label>Monthly Amount Set Aside for a House</label>
 <input id="monthlySave" class="money" type="text" placeholder="$0">
@@ -1246,7 +1329,7 @@ export default function Dashboard() {
 </div>
 
 <div class="card" id="mortgageSettingsCard">
-<h2 class="collapsible" onclick="toggleCollapse('mortgageSettingsCard')"><span class="step">6</span>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('mortgageSettingsCard')"><span class="step">6</span>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span><span class="hdr-sum" id="mortgageSettingsSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="mortgageSettingsBody">
 
 <label>What do you want to see? <span class="info" title="Max Home Price I Can Afford: shows the priciest home you can afford at your current Down Payment Savings pace (Section 5) and the affordability target below - no price entry needed. How Long For a Specific Price: type an exact home price and see the soonest you could responsibly buy it, plus what to change if it's out of reach.">i</span></label>
@@ -1283,7 +1366,7 @@ export default function Dashboard() {
 </div>
 
 <div class="card wide" id="mortgageResultsCard">
-<h2 class="collapsible" onclick="toggleCollapse('mortgageResultsCard')">30yr vs 15yr Results <span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('mortgageResultsCard')">30yr vs 15yr Results <span class="hdr-sum" id="mortgageResultsSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="mortgageResultsBody">
 <div id="maxAffordBlock">
 <div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
@@ -1339,7 +1422,7 @@ export default function Dashboard() {
 </div>
 
 <div class="card wide collapsed" id="customPayoffCard">
-<h2 class="collapsible" onclick="toggleCollapse('customPayoffCard')">Custom Payoff: Pay It Down Faster <span class="info hinfo" title="Models adding extra principal each month.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('customPayoffCard')">Custom Payoff: Pay It Down Faster <span class="info hinfo" title="Models adding extra principal each month.">i</span><span class="hdr-sum" id="customPayoffSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="customPayoffBody">
 <label>Extra Principal Toward the Mortgage Each Month</label>
 <input id="mortExtra" class="money" type="text" placeholder="$0">
@@ -1350,8 +1433,14 @@ export default function Dashboard() {
 </div>
 </div>
 
+</div>
+</div>
+</div>
+
+<!-- Monthly Overview stays outside the stages: it summarises all of them at once -->
+<div class="dashboard">
 <div class="card wide collapsed" id="overviewCard">
-<h2 class="collapsible" onclick="toggleCollapse('overviewCard')">Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span><span class="chevron">⌄</span></h2>
+<h2 class="collapsible" onclick="toggleCollapse('overviewCard')">Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span><span class="hdr-sum" id="overviewSum"></span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="overviewBody">
 <div class="stat-grid">
 <div class="stat"><div class="big num" id="incomeStat">$0</div><div class="label">Take-Home</div></div>
