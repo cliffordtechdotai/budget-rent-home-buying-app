@@ -746,6 +746,35 @@ function renderDebtSection(){
     return {debtSet,extra,anyDebt,baseMin,debtMonthly,perDebtOn,debtFreeYears,freedMonthly};
 }
 
+// Pay the debt down faster, or put the money in savings? Simulates one split of the
+// spare money and reports both the payoff date and the down payment you end up with.
+// Savings that ignore an unpaid balance are fiction, so leftover debt is netted out.
+function projectSplit(rows, extraToDebt, monthlySaveAmt, years, hysaPct, startingSavings, existingInHysa){
+    let debts=rows.filter(d=>d.balance>0).map(d=>({...d}));
+    let months=Math.round(years*12), sr=hysaPct/100/12;
+    let save=existingInHysa?startingSavings:0, payoff=null;
+    for(let i=0;i<months;i++){
+        let owing=debts.some(d=>d.balance>0);
+        if(owing){
+            for(let d of debts){ if(d.balance>0){ d.balance+=d.balance*(d.rate/100/12); } }
+            let pool=extraToDebt;
+            for(let d of debts){ if(d.balance>0){ d.balance-=Math.min(d.minPayment,d.balance); } }
+            let act=debts.filter(d=>d.balance>0).sort((a,b)=>b.rate-a.rate);
+            for(let d of act){ if(pool<=0) break; let p=Math.min(pool,d.balance); d.balance-=p; pool-=p; }
+            debts.forEach(d=>{ if(d.balance<=0.005) d.balance=0; });
+            if(!debts.some(d=>d.balance>0) && payoff===null) payoff=i+1;
+            save=(save+monthlySaveAmt)*(1+sr);
+        } else {
+            // debt gone: the whole former debt payment (minimums + extra) frees up
+            let freed=rows.reduce((s,d)=>s+d.minPayment,0)+extraToDebt;
+            save=(save+monthlySaveAmt+freed)*(1+sr);
+        }
+    }
+    if(!existingInHysa) save+=startingSavings;
+    let owed=debts.reduce((s,d)=>s+Math.max(0,d.balance),0);
+    return {payoff, savings:save, owed, net:save-owed};
+}
+
 // ---- export ----
 // collectData() is a save format: raw field strings, meant to be reloaded. A report is
 // the opposite - the computed answers, labelled, for a human or a spreadsheet. Each row
@@ -1041,6 +1070,52 @@ function calculateAll(){
     document.getElementById("stageMoney").classList.toggle("is-complete", s1Done);
     document.getElementById("stageObligations").classList.toggle("is-complete", s2Done);
     document.getElementById("stageHouse").classList.toggle("is-complete", s3Done);
+
+    // ---- pay debt down faster, or save it? ----
+    // The honest rule is just debt rate vs savings rate, but people want to see it in
+    // dollars, so this shows a few concrete splits of the spare money. It deliberately
+    // says when the difference is trivial rather than implying a wrong precision.
+    let dvsEl=document.getElementById("debtVsSave");
+    if(dvsEl){
+        let hysaPct=numVal("hysaRate"), spare=Math.max(0,leftover);
+        if(!anyDebt || takeHome<=0 || saveYears<=0){
+            dvsEl.innerHTML="";
+        } else if(spare<25){
+            dvsEl.innerHTML="<b>Pay debt faster, or save it?</b><br>Assign some leftover money above and this will compare splitting it between debt and the house fund.";
+        } else {
+            let totalBal=debtSet.reduce((s,d)=>s+d.balance,0);
+            let avgRate=totalBal>0?debtSet.reduce((s,d)=>s+d.rate*d.balance,0)/totalBal:0;
+            let splits=[
+                {lbl:"All to savings", toDebt:extra, toSave:monthlySave+spare},
+                {lbl:"Split evenly", toDebt:extra+spare/2, toSave:monthlySave+spare/2},
+                {lbl:"All to debt", toDebt:extra+spare, toSave:monthlySave}
+            ];
+            let existing=numVal("existingSavings"), inHysa=document.getElementById("existingInHysa").checked;
+            let results=splits.map(s=>({...s, r:projectSplit(debtSet,s.toDebt,s.toSave,saveYears,hysaPct,existing,inHysa)}));
+            let cleared=results.filter(x=>x.r.payoff!==null);
+            let best=(cleared.length?cleared:results).reduce((a,b)=>b.r.net>a.r.net?b:a);
+            let spreadPct=(()=>{ let ns=results.map(x=>x.r.net); let lo=Math.min(...ns),hi=Math.max(...ns); return hi>0?((hi-lo)/hi)*100:0; })();
+
+            let rows=results.map(x=>{
+                let mark = x===best ? ' <span class="flag-ok">&larr; best</span>' : '';
+                let when = x.r.payoff!==null ? fmtMonths(x.r.payoff)+" to debt-free" : '<span class="flag-bad">never pays off</span>';
+                return '<div style="display:flex;gap:10px;justify-content:space-between;padding:3px 0;"><span>'+x.lbl
+                     +' ('+money(x.toDebt)+' debt / '+money(x.toSave)+' save)</span><span>'+when+' &middot; '
+                     +money(x.r.net)+mark+'</span></div>';
+            }).join("");
+
+            let verdict = spreadPct<1.5
+                ? "Your debt rate ("+avgRate.toFixed(1)+"%) is close to your savings rate ("+hysaPct+"%), so this barely changes the outcome - under "+spreadPct.toFixed(1)+"% either way. Choose whichever helps you sleep."
+                : (avgRate>hysaPct
+                    ? "Your debt costs "+avgRate.toFixed(1)+"% while savings earn "+hysaPct+"%, so clearing it early is the better return."
+                    : "Your savings earn "+hysaPct+"% while the debt costs only "+avgRate.toFixed(1)+"%, so there's little rush to overpay it.");
+
+            dvsEl.innerHTML='<b>Pay debt faster, or save it?</b> <span class="info" title="Splits your '+money(spare)
+                +'/mo of unassigned money three ways and projects each to your '+saveYears
+                +'-year mark. Down payment is net of any debt still owed, since savings that ignore an unpaid balance are not real.">i</span><br>'
+                +rows+'<div style="margin-top:6px;">'+verdict+'</div>';
+        }
+    }
 
     // Snapshot the computed answers for CSV/text export. Built here so an export can
     // never disagree with what's on screen - both come from this same pass.
@@ -1446,6 +1521,7 @@ export default function Dashboard() {
 <div class="rb-sub" id="debtExtraNote"></div>
 </div>
 <div class="hint" id="debtTimeline" style="margin-top:10px;"></div>
+<div class="hint" id="debtVsSave" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);"></div>
 </div>
 </div>
 
