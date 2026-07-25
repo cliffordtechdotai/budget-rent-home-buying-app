@@ -46,7 +46,6 @@ h1 { text-align:center; font-size:30px; font-weight:700; letter-spacing:-0.025em
 .dashboard { display:flex; flex-wrap:wrap; gap:16px; }
 .card { flex:1 1 320px; background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:24px; }
 .card.wide { flex:1 1 100%; }
-.card-column { flex:1 1 320px; display:flex; flex-direction:column; gap:16px; }
 .card h2 { margin:0 0 18px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:var(--ink-soft); padding-bottom:12px; border-bottom:1px solid var(--line); display:flex; align-items:center; }
 .card h2.collapsible { cursor:pointer; user-select:none; }
 .card h2.collapsible .chevron { margin-left:auto; font-size:15px; transition:transform 0.22s ease; color:var(--ink-faint); font-weight:400; }

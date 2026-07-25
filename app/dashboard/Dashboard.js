@@ -1054,8 +1054,9 @@ export default function Dashboard() {
 <div class="dashboard">
 
 <!-- 1 TAKE HOME -->
-<div class="card">
-<h2><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span></h2>
+<div class="card" id="takeHomeCard">
+<h2 class="collapsible" onclick="toggleCollapse('takeHomeCard')"><span class="step">1</span>Take-Home Pay <span class="info hinfo" title="Your actual take-home pay after taxes. Everything else is measured against this number. Enter it directly, or check the box to estimate it from a gross salary.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="takeHomeBody">
 <label>Household</label>
 <select id="householdType" onchange="onHouseholdTypeChange()">
 <option value="single">Single</option>
@@ -1118,10 +1119,12 @@ export default function Dashboard() {
 </div>
 <div class="hint" style="margin-top:10px;">Tax estimate is approximate, not tax advice. Toggle the box above to compare your numbers with and without estimated tax; both are kept as you switch.</div>
 </div>
+</div>
 
 <!-- 2 EXPENSES -->
-<div class="card">
-<h2><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span></h2>
+<div class="card" id="expensesCard">
+<h2 class="collapsible" onclick="toggleCollapse('expensesCard')"><span class="step">2</span>Monthly Expenses <span class="info hinfo" title="Your regular monthly bills and spending. Use a preset to start from typical averages, then adjust. This is subtracted from take-home first.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="expensesBody">
 <label>Quick-Fill Preset</label>
 <select id="expensePreset" onchange="applyPreset()">
 <option value="custom">Custom (enter your own)</option>
@@ -1150,9 +1153,9 @@ export default function Dashboard() {
 <div class="rb-sub num" id="expensePctSub"></div>
 </div>
 </div>
+</div>
 
-<!-- 3/4 DEBT + GOALS share one column (moved earlier - affect what's left over for house savings) -->
-<div class="card-column">
+<!-- 3/4 DEBT + GOALS side by side (moved earlier - affect what's left over for house savings) -->
 <div class="card collapsed" id="debtCard">
 <h2 class="collapsible" onclick="toggleCollapse('debtCard')"><span class="step">3</span>Debt Payoff <span class="info hinfo" title="Any debt you carry. The tool figures out how long to pay it off.">i</span><span class="chevron">⌄</span></h2>
 <div class="collapse-body" id="debtBody">
@@ -1211,15 +1214,15 @@ export default function Dashboard() {
 </div>
 </div>
 </div>
-</div>
 
 <!-- 5 DOWN PAYMENT SAVINGS moved into row 2, paired side-by-side with card 6 below -->
 </div>
 
 <div class="dashboard" style="margin-top:20px;">
 
-<div class="card">
-<h2><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
+<div class="card" id="downSavingsCard">
+<h2 class="collapsible" onclick="toggleCollapse('downSavingsCard')"><span class="step">5</span>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="downSavingsBody">
 <label>Monthly Amount Set Aside for a House</label>
 <input id="monthlySave" class="money" type="text" placeholder="$0">
 <input type="range" id="monthlySaveSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('monthlySave','monthlySaveSlider')">
@@ -1240,9 +1243,11 @@ export default function Dashboard() {
 <div class="rb-sub num" id="savePercentSub"></div>
 </div>
 </div>
+</div>
 
-<div class="card">
-<h2><span class="step">6</span>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
+<div class="card" id="mortgageSettingsCard">
+<h2 class="collapsible" onclick="toggleCollapse('mortgageSettingsCard')"><span class="step">6</span>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="mortgageSettingsBody">
 
 <label>What do you want to see? <span class="info" title="Max Home Price I Can Afford: shows the priciest home you can afford at your current Down Payment Savings pace (Section 5) and the affordability target below - no price entry needed. How Long For a Specific Price: type an exact home price and see the soonest you could responsibly buy it, plus what to change if it's out of reach.">i</span></label>
 <select id="affordModeSelect" onchange="onAffordModeChange()">
@@ -1275,8 +1280,11 @@ export default function Dashboard() {
 <label style="font-weight:normal;margin:0;">Be debt-free before buying <span class="info" title="On (recommended): once your debt clears, that freed-up payment automatically rolls into house savings - this applies to your Down Payment Savings projection and the Max-Afford price too, not just the Custom Price search below. Off: model buying while still carrying debt.">i</span></label>
 </div>
 </div>
+</div>
 
-<div class="card wide">
+<div class="card wide" id="mortgageResultsCard">
+<h2 class="collapsible" onclick="toggleCollapse('mortgageResultsCard')">30yr vs 15yr Results <span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="mortgageResultsBody">
 <div id="maxAffordBlock">
 <div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
 <div class="compare" id="maxAffordResult" style="margin-top:10px;"></div>
@@ -1328,9 +1336,11 @@ export default function Dashboard() {
 <div class="hint" style="margin-top:12px;">Assumes today's price and rate hold steady.</div>
 </div>
 </div>
+</div>
 
-<div class="card wide">
-<h2>Custom Payoff: Pay It Down Faster <span class="info hinfo" title="Models adding extra principal each month.">i</span></h2>
+<div class="card wide collapsed" id="customPayoffCard">
+<h2 class="collapsible" onclick="toggleCollapse('customPayoffCard')">Custom Payoff: Pay It Down Faster <span class="info hinfo" title="Models adding extra principal each month.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="customPayoffBody">
 <label>Extra Principal Toward the Mortgage Each Month</label>
 <input id="mortExtra" class="money" type="text" placeholder="$0">
 <input type="range" id="mortExtraSlider" class="slider" min="0" max="2000" value="0" oninput="onSlider('mortExtra','mortExtraSlider')">
@@ -1338,9 +1348,11 @@ export default function Dashboard() {
 <div class="compare" id="customPayoffResult"></div>
 <div class="writeup" id="milestoneWriteup"></div>
 </div>
+</div>
 
-<div class="card wide">
-<h2>Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span></h2>
+<div class="card wide collapsed" id="overviewCard">
+<h2 class="collapsible" onclick="toggleCollapse('overviewCard')">Monthly Overview: Where It All Goes <span class="info hinfo" title="A live snapshot of every dollar of take-home.">i</span><span class="chevron">⌄</span></h2>
+<div class="collapse-body" id="overviewBody">
 <div class="stat-grid">
 <div class="stat"><div class="big num" id="incomeStat">$0</div><div class="label">Take-Home</div></div>
 <div class="stat"><div class="big num" id="expenseStat">$0</div><div class="label">Expenses</div><div class="subpct" id="expenseStatPct"></div></div>
@@ -1350,6 +1362,7 @@ export default function Dashboard() {
 <div class="stat"><div class="big num" id="leftoverStat">$0</div><div class="label">Left Over</div><div class="subpct" id="leftoverStatPct"></div></div>
 </div>
 <div class="hint" id="overviewNote" style="margin-top:14px;text-align:center;"></div>
+</div>
 </div>
 
 </div>
