@@ -669,58 +669,11 @@ function renderOptimalPlan(c){
     }
 }
 
-// Main calculation
-function calculateAll(){
-    let takeHome=getMonthlyTakeHome();
-    let calcGross=document.getElementById("calcFromGross").checked;
-    let hh=document.getElementById("householdType").value;
-
-    document.getElementById("incomeTotalLine").textContent=(calcGross||hh==="couple")?"Combined take-home: "+money(getYearlyIncome())+"/yr":"";
-    let taxEl=document.getElementById("taxBreakdown");
-    if(calcGross){ let b=computeGrossBreakdown(); taxEl.textContent="Est. Federal "+money(b.fedTax)+" · FICA "+money(b.fica)+" · State "+money(b.stateTax); } else taxEl.textContent="";
-    document.getElementById("monthlyIncomeResult").textContent=money(takeHome);
-
-    let gnEl=document.getElementById("grossNetCompare");
-    if(calcGross){
-        let b=computeGrossBreakdown();
-        let grossMonthly=b.gross/12;
-        gnEl.innerHTML=\`before tax: \${money(grossMonthly)}/mo · after tax: \${money(takeHome)}/mo · tax takes \${money(grossMonthly-takeHome)}/mo\`;
-    } else {
-        gnEl.textContent="";
-    }
-
-    let expenses=calcTotalExpenses();
-    document.getElementById("expenseResult").textContent=money(expenses);
-    setMoney("currentRent", numVal("expRent"));
-    let expPct=takeHome>0?(expenses/takeHome)*100:0;
-    let expPctEl=document.getElementById("expensePctSub");
-    expPctEl.textContent=\`\${expPct.toFixed(1)}% of take-home\`;
-    expPctEl.className="rb-sub num "+(expPct>100?"flag-bad":"");
-    let rentPctEl=document.getElementById("rentPct");
-    let rentAmt=numVal("expRent");
-    rentPctEl.textContent = (takeHome>0 && rentAmt>0) ? \`\${((rentAmt/takeHome)*100).toFixed(1)}% of take-home\` : "";
-
-    let saveYears=numVal("saveYears")||0;
-    let monthlySave=numVal("monthlySave");
-    let savePct=takeHome>0?(monthlySave/takeHome)*100:0;
-    document.getElementById("savePercentSub").textContent=\`\${money(monthlySave)}/mo · \${savePct.toFixed(1)}% of take-home\`;
-
-    let lumpBal=numVal("lumpBalance");
-    let lumpPayEl=document.getElementById("lumpPayment");
-    let lumpHint=document.getElementById("lumpPayHint");
-    if(!document.getElementById("perDebtMode").checked){
-        if(!lumpPaymentEdited && lumpBal>0){
-            let est=estimateMinPayment(lumpBal);
-            lumpPayEl.value="~"+money(est);
-            lumpPayEl.classList.add("estimated");
-            lumpHint.textContent="(estimated, click to change)";
-        } else if(!lumpPaymentEdited){
-            lumpPayEl.value=""; lumpPayEl.classList.remove("estimated"); lumpHint.textContent="";
-        } else {
-            lumpPayEl.classList.remove("estimated"); lumpHint.textContent="";
-        }
-    }
-
+// Reads the debt inputs, runs the payoff simulation, and renders the debt card
+// (result box, per-debt timeline, and the Even/Avalanche/Snowball comparison).
+// Unlike renderOptimalPlan this also PRODUCES values the rest of the pipeline needs,
+// so it returns them explicitly rather than leaking them through closure scope.
+function renderDebtSection(){
     let debtSet=getDebtSet();
     let extra=numVal("debtExtra");
     let anyDebt=debtSet.length>0;
@@ -789,6 +742,62 @@ function calculateAll(){
             ["pillEven","pillHighInterest","pillSmallBalance"].forEach(id=>document.getElementById(id).title="");
         }
     }
+    return {debtSet,extra,anyDebt,baseMin,debtMonthly,perDebtOn,debtFreeYears,freedMonthly};
+}
+
+// Main calculation
+function calculateAll(){
+    let takeHome=getMonthlyTakeHome();
+    let calcGross=document.getElementById("calcFromGross").checked;
+    let hh=document.getElementById("householdType").value;
+
+    document.getElementById("incomeTotalLine").textContent=(calcGross||hh==="couple")?"Combined take-home: "+money(getYearlyIncome())+"/yr":"";
+    let taxEl=document.getElementById("taxBreakdown");
+    if(calcGross){ let b=computeGrossBreakdown(); taxEl.textContent="Est. Federal "+money(b.fedTax)+" · FICA "+money(b.fica)+" · State "+money(b.stateTax); } else taxEl.textContent="";
+    document.getElementById("monthlyIncomeResult").textContent=money(takeHome);
+
+    let gnEl=document.getElementById("grossNetCompare");
+    if(calcGross){
+        let b=computeGrossBreakdown();
+        let grossMonthly=b.gross/12;
+        gnEl.innerHTML=\`before tax: \${money(grossMonthly)}/mo · after tax: \${money(takeHome)}/mo · tax takes \${money(grossMonthly-takeHome)}/mo\`;
+    } else {
+        gnEl.textContent="";
+    }
+
+    let expenses=calcTotalExpenses();
+    document.getElementById("expenseResult").textContent=money(expenses);
+    setMoney("currentRent", numVal("expRent"));
+    let expPct=takeHome>0?(expenses/takeHome)*100:0;
+    let expPctEl=document.getElementById("expensePctSub");
+    expPctEl.textContent=\`\${expPct.toFixed(1)}% of take-home\`;
+    expPctEl.className="rb-sub num "+(expPct>100?"flag-bad":"");
+    let rentPctEl=document.getElementById("rentPct");
+    let rentAmt=numVal("expRent");
+    rentPctEl.textContent = (takeHome>0 && rentAmt>0) ? \`\${((rentAmt/takeHome)*100).toFixed(1)}% of take-home\` : "";
+
+    let saveYears=numVal("saveYears")||0;
+    let monthlySave=numVal("monthlySave");
+    let savePct=takeHome>0?(monthlySave/takeHome)*100:0;
+    document.getElementById("savePercentSub").textContent=\`\${money(monthlySave)}/mo · \${savePct.toFixed(1)}% of take-home\`;
+
+    let lumpBal=numVal("lumpBalance");
+    let lumpPayEl=document.getElementById("lumpPayment");
+    let lumpHint=document.getElementById("lumpPayHint");
+    if(!document.getElementById("perDebtMode").checked){
+        if(!lumpPaymentEdited && lumpBal>0){
+            let est=estimateMinPayment(lumpBal);
+            lumpPayEl.value="~"+money(est);
+            lumpPayEl.classList.add("estimated");
+            lumpHint.textContent="(estimated, click to change)";
+        } else if(!lumpPaymentEdited){
+            lumpPayEl.value=""; lumpPayEl.classList.remove("estimated"); lumpHint.textContent="";
+        } else {
+            lumpPayEl.classList.remove("estimated"); lumpHint.textContent="";
+        }
+    }
+
+    const {debtSet,extra,anyDebt,baseMin,debtMonthly,perDebtOn,debtFreeYears,freedMonthly}=renderDebtSection();
 
     // Down payment projection: once debt is paid off, that freed-up payment rolls into
     // house savings (same "debt-free-first" rollover the Custom Price mode's optimal
