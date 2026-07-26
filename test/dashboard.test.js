@@ -216,7 +216,7 @@ test('the monthly overview columns add up', () => {
   assert.strictEqual(income - expenses - savings - debt - goals, left);
 });
 
-test('extra mortgage principal is not charged against today"s budget', () => {
+test("extra mortgage principal is not charged against today's budget", () => {
   // It only starts after you buy, by which point the house saving has stopped.
   // Counting both at once once reported being $1,535 over budget when the real
   // figure was $17 spare.
@@ -291,13 +291,55 @@ test('every spreadsheet row has exactly four columns', () => {
   assert.strictEqual(wrong.length, 0, `these rows have the wrong column count: ${JSON.stringify(wrong)}`);
 });
 
-test('saving and reloading restores the same numbers', () => {
+test('everything you typed is captured in the saved file', () => {
+  // The app writes this same structure to the browser on every keystroke and to disk
+  // when you use Save As, so if a field goes missing here it is missing from backups too.
+  const d = baseScenario(loadDashboard());
+  const raw = d.win.localStorage.getItem('budgetDashboardData_v5');
+  assert.ok(raw, 'nothing was saved at all');
+
+  const saved = JSON.parse(raw);
+  const expected = {
+    grossJoint: '$120,000',
+    stateSelect: 'PA',
+    expRent: '$1,600',
+    expOther: '$200',
+    monthlySave: '$1,500',
+    saveYears: '3',
+    hysaRate: '3',
+    mortgageRate: '6.5',
+    jointIncomeMode: true,
+    calcFromGross: true,
+  };
+  for (const [field, value] of Object.entries(expected)) {
+    assert.strictEqual(saved[field], value, `the saved file lost "${field}"`);
+  }
+  // the open/closed state of each section rides along too
+  assert.ok(saved.__collapsed && typeof saved.__collapsed === 'object', 'section layout was not saved');
+});
+
+test('a saved file can be read back and reproduces the same take-home figure', () => {
+  // Round trip: capture the save, wipe every field, load it back, recalculate.
   const d = baseScenario(loadDashboard());
   const before = d.text('monthlyIncomeResult');
-  const saved = JSON.parse(JSON.stringify(d.win.collectDataForTest ? d.win.collectDataForTest() : {}));
-  // If the app does not expose its save data for testing, fall back to checking the
-  // browser copy, which is written on every recalculation.
-  assert.ok(before, 'no take-home figure was produced');
+  const saved = JSON.parse(d.win.localStorage.getItem('budgetDashboardData_v5'));
+
+  // wipe the form the way Clear All would
+  ['grossJoint', 'expRent', 'expUtilities', 'expGroceries', 'expGas', 'expInsurance',
+   'expSubs', 'expPhone', 'expOther', 'monthlySave'].forEach(id => d.set(id, ''));
+  d.win.calculateAll();
+  assert.notStrictEqual(d.text('monthlyIncomeResult'), before, 'wiping the form should change the result');
+
+  // put the saved values back exactly as the loader does, then recalculate
+  Object.entries(saved).forEach(([field, value]) => {
+    if (field.startsWith('__')) return;
+    const el = d.REG[field];
+    if (!el) return;
+    if (typeof value === 'boolean') el.checked = value; else el.value = value;
+  });
+  d.win.calculateAll();
+  assert.strictEqual(d.text('monthlyIncomeResult'), before,
+    'reloading a saved file should reproduce the original take-home figure');
 });
 
 // ---------------------------------------------------------------------------
