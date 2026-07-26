@@ -449,3 +449,18 @@ test('images referenced by articles actually exist', () => {
     }
   }
 });
+
+test('markdown tables turn into real tables', async () => {
+  // Tables are a GitHub extension, not plain markdown. Without remark-gfm wired in
+  // they render as raw pipe characters, which is how they first shipped.
+  const { remark } = await import('remark');
+  const remarkHtml = (await import('remark-html')).default;
+  const remarkGfm = (await import('remark-gfm')).default;
+
+  const md = '| A | B |\n| --- | --- |\n| 1 | 2 |';
+  const out = String(await remark().use(remarkGfm).use(remarkHtml, { sanitize: false }).process(md));
+
+  assert.match(out, /<table>/, 'the table did not become a real table');
+  assert.match(out, /<th>A<\/th>/, 'the header row is missing');
+  assert.ok(!out.includes('| A | B |'), 'raw pipe characters are still showing');
+});

@@ -45,6 +45,8 @@ Numbered when order matters:
 
 ## Tables
 
+These need the table add-on, which is installed - just write them like this:
+
 | Option | Monthly | Total interest |
 | --- | --- | --- |
 | 30-year | $2,528 | $510,178 |

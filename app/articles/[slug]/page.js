@@ -3,6 +3,9 @@ import path from 'path';
 import matter from 'gray-matter';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
+// Tables, strikethrough and bare-URL linking are GitHub extensions, not part of
+// plain markdown. Without this a table renders as raw pipe characters.
+import remarkGfm from 'remark-gfm';
 
 async function getArticle(slug) {
   const filePath = path.join(process.cwd(), 'content', 'articles', `${slug}.md`);
@@ -17,6 +20,7 @@ async function getArticle(slug) {
   // sanitize:false keeps raw HTML you write in the markdown (for the odd embed);
   // everything here is authored by you, never submitted by a visitor.
   const processedContent = await remark()
+    .use(remarkGfm)
     .use(remarkHtml, { sanitize: false })
     .process(content);
 
