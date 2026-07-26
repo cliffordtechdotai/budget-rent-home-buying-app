@@ -26,7 +26,7 @@ const STATE_RATES = {
 };
 
 const MONEY_IDS = ["yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","grossJoint","monthlyIncomeOverride","monthlySave","existingSavings","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","lumpBalance","lumpPayment","debtExtra","mortExtra","homePrice"];
-const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","customTargets","targetDownPct","targetPaymentPct","affordModeSelect"];
+const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyIncomeSingle","yearlyIncomePerson1","yearlyIncomePerson2","yearlyIncomeJoint","grossSingle","grossPerson1","grossPerson2","jointIncomeMode","grossJoint","monthlyIncomeOverride","monthlySave","saveYears","hysaRate","existingSavings","existingInHysa","expensePreset","expRent","expUtilities","expGroceries","expGas","expInsurance","expSubs","expPhone","expOther","perDebtMode","lumpBalance","lumpRate","lumpPayment","debtExtra","mortExtra","homePrice","useSavingsToggle","downPayment","downPaymentMode","mortgageRate","closingCostPercent","taxMaintPercent","includeTaxMaint","showPmi","currentRent","rentIncrease","debtFreeFirst","startDate","targetDownPct","targetPaymentPct","affordModeSelect"];
 
 // Every collapsible section, in page order. Cards that share a row with a sibling are
 // NOT in here on purpose: their stage owns the collapse. A collapsed card sitting beside
@@ -116,11 +116,6 @@ function onDownModeChange(){
     calculateAll();
 }
 
-function toggleCustomTargets(){
-    let on=document.getElementById("customTargets").checked;
-    document.getElementById("customTargetsBlock").style.display=on?"block":"none";
-    calculateAll();
-}
 
 function onAffordModeChange(){
     let mode=document.getElementById("affordModeSelect").value;
@@ -129,15 +124,9 @@ function onAffordModeChange(){
     calculateAll();
 }
 
-function getTargetDownPct(){
-    if(document.getElementById("customTargets").checked){ let v=numVal("targetDownPct"); return v>0?v:20; }
-    return 20;
-}
+function getTargetDownPct(){ let v=numVal("targetDownPct"); return v>0?v:20; }
 
-function getTargetPaymentPct(){
-    if(document.getElementById("customTargets").checked){ let v=numVal("targetPaymentPct"); return v>0?v:28; }
-    return 28;
-}
+function getTargetPaymentPct(){ let v=numVal("targetPaymentPct"); return v>0?v:28; }
 
 function updateDownPlaceholder(){
     let mode=document.getElementById("downPaymentMode").value;
@@ -1343,7 +1332,7 @@ function applyData(data){
     if(data.__debtStrategy) setDebtStrategy(data.__debtStrategy);
     // tolerant of older saves that only recorded debtCard/goalCard
     if(data.__collapsed){ COLLAPSIBLE_IDS.forEach(id=>{ let el=document.getElementById(id); if(el && (id in data.__collapsed)) el.classList.toggle("collapsed",data.__collapsed[id]); }); }
-    ensureValidState(); updateHouseholdVisibility(); onAffordModeChange(); toggleDownPayment(); toggleDebtMode(); toggleCustomTargets(); calculateAll();
+    ensureValidState(); updateHouseholdVisibility(); onAffordModeChange(); toggleDownPayment(); toggleDebtMode(); calculateAll();
 }
 function saveToLocalStorage(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(collectData())); }catch(e){} }
 function loadFromLocalStorage(){ try{ let r=localStorage.getItem(STORAGE_KEY); if(r){ applyData(JSON.parse(r)); return true; } }catch(e){} return false; }
@@ -1406,7 +1395,6 @@ window.toggleCollapse=toggleCollapse;
 window.toggleAllSections=toggleAllSections;
 window.toggleDownPayment=toggleDownPayment;
 window.onDownModeChange=onDownModeChange;
-window.toggleCustomTargets=toggleCustomTargets;
 window.onAffordModeChange=onAffordModeChange;
 window.toggleDebtMode=toggleDebtMode;
 window.setDebtStrategy=setDebtStrategy;
@@ -1440,7 +1428,6 @@ if(!loaded){
 }
 (function(){ let el=document.getElementById("startDate"); if(el && !el.value){ let t=new Date(); el.value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); } })();
 toggleDownPayment();
-toggleCustomTargets();
 calculateAll();
 })();
 `;
@@ -1759,15 +1746,9 @@ export default function Dashboard() {
 <div><label>Plan Start Date <span class="info" title="Everything counts forward from this date. It's saved automatically, so if you entered a test date before, it'll keep loading that instead of today until you change it or click Reset.">i</span></label><div class="field-suffix"><div><input id="startDate" type="date"></div><div><button type="button" style="padding:10px 8px;font-size:12px;" onclick="resetStartDateToToday()">Reset</button></div></div></div>
 <div><label>Current Monthly Rent <span class="info" title="Mirrors your Rent / Housing expense so the cost of waiting always matches your budget.">i</span></label><input id="currentRent" class="money locked" type="text" placeholder="$0" readonly></div>
 </div>
-<div class="toggle-row">
-<input type="checkbox" id="customTargets" onchange="toggleCustomTargets()">
-<label style="font-weight:normal;margin:0;">Custom targets <span class="info" title="By default this requires 20% down (avoids PMI) and keeps the payment at or under 28% of take-home. Change those here.">i</span></label>
-</div>
-<div id="customTargetsBlock" style="display:none;">
 <div class="row2">
-<div><label>Target Down Payment (%)</label><input id="targetDownPct" type="number" placeholder="20"></div>
-<div><label>Max Payment (% of take-home)</label><input id="targetPaymentPct" type="number" placeholder="28"></div>
-</div>
+<div><label>Target Down Payment (%) <span class="info" title="How much of the price you want to have saved before buying. 20% is the usual mark because it avoids PMI. Lower it and you can buy sooner, but PMI gets added until you reach 20% equity.">i</span></label><input id="targetDownPct" type="number" placeholder="20" value="20"></div>
+<div><label>Max Payment (% of take-home) <span class="info" title="The biggest monthly payment you are willing to carry, as a share of take-home. 28% is the common lending guideline. Whichever of these two targets is harder to meet is the one that sets your buy date.">i</span></label><input id="targetPaymentPct" type="number" placeholder="28" value="28"></div>
 </div>
 
 <div class="section-head">How long until you can afford it</div>
