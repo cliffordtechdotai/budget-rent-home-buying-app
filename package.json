@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A free, privacy-first budgeting and house-planning calculator. Everything runs in the browser — no accounts, no server, no data leaves the user's machine. Plans can be saved to and loaded from a local file.",
   "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
