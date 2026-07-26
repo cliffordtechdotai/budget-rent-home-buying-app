@@ -27,6 +27,7 @@ async function getArticles() {
       slug,
       title: data.title || 'Untitled',
       date: data.date || '',
+      author: data.author || '',
       description: data.description || '',
       image: data.image || '',
     };
@@ -59,9 +60,9 @@ export default async function ArticlesPage() {
                   {article.title}
                 </Link>
               </h2>
-              {article.date && (
+              {(article.author || article.date) && (
                 <p className="article-date">
-                  {new Date(article.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {[article.author, article.date && new Date(article.date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })].filter(Boolean).join(" · ")}
                 </p>
               )}
               {article.description && <p>{article.description}</p>}

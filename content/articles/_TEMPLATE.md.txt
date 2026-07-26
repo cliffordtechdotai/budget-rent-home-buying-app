@@ -1,0 +1,64 @@
+---
+title: "Your Headline Goes Here"
+author: "Curtis Clifford"
+date: "2026-07-26"
+description: "One or two sentences. Shows under the title and is what Google displays in search results."
+image: ""
+imageAlt: ""
+---
+
+Open with a sentence or two that says what the reader will get. This first
+paragraph sits right under the heading, so make it count.
+
+## A section heading
+
+Normal paragraphs just go on their own lines with a blank line between them.
+
+Use **bold** for the thing you want someone to catch while skimming, and
+*italics* for emphasis inside a sentence.
+
+## Links
+
+An ordinary link looks like this: [the down payment calculator](/).
+
+Linking to another site works the same way:
+[Consumer Financial Protection Bureau](https://www.consumerfinance.gov/).
+
+Link to your own pages with a slash and no domain — `/`, `/articles`,
+`/privacy`, or `/articles/some-other-article`.
+
+## Lists
+
+- First point
+- Second point
+- Third point
+
+Numbered when order matters:
+
+1. Do this first
+2. Then this
+3. Finally this
+
+## Quotes and asides
+
+> Pull out a line worth dwelling on with a > in front of it.
+
+## Tables
+
+| Option | Monthly | Total interest |
+| --- | --- | --- |
+| 30-year | $2,528 | $510,178 |
+| 15-year | $3,485 | $227,268 |
+
+## Images (optional)
+
+Put the file in `public/articles/` then reference it without that folder name:
+
+![Describe the image for screen readers](/articles/your-image.jpg)
+
+For a big image at the very top of the article, don't put it in the body —
+set `image:` in the block at the top of this file instead.
+
+---
+
+Close with what you want the reader to do next.

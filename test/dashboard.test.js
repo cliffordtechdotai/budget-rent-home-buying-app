@@ -385,3 +385,67 @@ test('every figure the code tries to display has somewhere to go', () => {
   const missing = [...wanted].filter(id => !present.has(id));
   assert.deepStrictEqual(missing, [], `no place on the page for: ${missing.join(', ')}`);
 });
+
+// ---------------------------------------------------------------------------
+// Articles
+// ---------------------------------------------------------------------------
+
+test('every article file has the details the page needs', () => {
+  // A missing title or date shows up as "Untitled" or a blank byline on the live site.
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+  assert.ok(files.length > 0, 'there are no articles at all');
+
+  for (const file of files) {
+    const raw = fs.readFileSync(path.join(dir, file), 'utf-8');
+    assert.ok(raw.startsWith('---'), `${file} is missing the details block at the top`);
+    const block = raw.split('---')[1] || '';
+    for (const field of ['title', 'date', 'description']) {
+      assert.match(block, new RegExp('^' + field + ':', 'm'), `${file} is missing "${field}"`);
+    }
+    const date = (block.match(/^date:\s*"?([\d-]+)"?/m) || [])[1];
+    assert.match(date || '', /^\d{4}-\d{2}-\d{2}$/, `${file} has a date that is not YYYY-MM-DD`);
+  }
+});
+
+test('article links point somewhere that exists', () => {
+  // Catches a link written as (articles/foo) instead of (/articles/foo), and any
+  // internal link to a page or article that is not there.
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+  const slugs = fs.readdirSync(dir).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''));
+  const realPages = ['/', '/articles', '/privacy', ...slugs.map(s => `/articles/${s}`)];
+
+  for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
+    const body = fs.readFileSync(path.join(dir, file), 'utf-8');
+    for (const m of body.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+      const target = m[1].trim();
+      if (target.startsWith('http') || target.startsWith('#') || target.startsWith('mailto:')) continue;
+      if (target.startsWith('/articles/') || target.startsWith('/')) {
+        if (target.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) continue;   // images checked below
+        assert.ok(realPages.includes(target.replace(/\/$/, '') || '/'),
+          `${file} links to ${target}, which is not a page on this site`);
+      } else {
+        assert.fail(`${file} links to "${target}" - internal links need a leading slash, e.g. /articles/${target}`);
+      }
+    }
+  }
+});
+
+test('images referenced by articles actually exist', () => {
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+  const publicDir = path.join(__dirname, '..', 'public');
+
+  for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
+    const raw = fs.readFileSync(path.join(dir, file), 'utf-8');
+    const refs = [];
+    for (const m of raw.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) refs.push(m[1].trim());
+    const hero = (raw.match(/^image:\s*"([^"]+)"/m) || [])[1];
+    if (hero) refs.push(hero);
+
+    for (const ref of refs) {
+      if (ref.startsWith('http') || ref === '') continue;
+      assert.ok(fs.existsSync(path.join(publicDir, ref)),
+        `${file} uses the image ${ref}, but public${ref} does not exist`);
+    }
+  }
+});

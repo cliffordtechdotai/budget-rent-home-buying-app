@@ -1,8 +1,9 @@
 ---
 title: "Getting Started: Renting vs. Buying"
+author: "Curtis Clifford"
 date: "2026-07-24"
 description: "A primer on the trade-offs between renting and buying, and how this calculator can help you decide."
-image: "/articles/getting-started.jpg"
+image: ""
 ---
 
 ## What This Article Covers
@@ -55,5 +56,7 @@ The calculator uses real tax brackets and rates for federal and state income tax
 - Adjust your expenses: be honest about what you actually spend.
 - Play with different savings rates and mortgage prices.
 - Check the rent vs. buy breakdown at the bottom—it shows you the real cost of waiting.
+
+Ready to run your own numbers? [Open the calculator](/) and start with your take-home pay.
 
 Good luck with your decision.

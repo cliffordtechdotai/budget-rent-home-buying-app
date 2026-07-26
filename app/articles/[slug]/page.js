@@ -14,16 +14,24 @@ async function getArticle(slug) {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
   const { data, content } = matter(fileContent);
 
+  // sanitize:false keeps raw HTML you write in the markdown (for the odd embed);
+  // everything here is authored by you, never submitted by a visitor.
   const processedContent = await remark()
-    .use(remarkHtml)
+    .use(remarkHtml, { sanitize: false })
     .process(content);
+
+  // Rough reading time so the reader knows what they're committing to.
+  const words = content.trim().split(/\s+/).length;
 
   return {
     slug,
     title: data.title || 'Untitled',
     date: data.date || '',
+    author: data.author || '',
     description: data.description || '',
     image: data.image || '',
+    imageAlt: data.imageAlt || data.title || '',
+    readingMinutes: Math.max(1, Math.round(words / 200)),
     content: processedContent.toString(),
   };
 }
@@ -45,8 +53,11 @@ export async function generateStaticParams() {
   return params;
 }
 
+// Next.js 15+ hands `params` in as a promise, so it has to be awaited. Reading
+// params.slug directly gave undefined, which made every article 404.
 export async function generateMetadata({ params }) {
-  const article = await getArticle(params.slug);
+  const { slug } = await params;
+  const article = await getArticle(slug);
 
   if (!article) {
     return {
@@ -63,7 +74,8 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ArticlePage({ params }) {
-  const article = await getArticle(params.slug);
+  const { slug } = await params;
+  const article = await getArticle(slug);
 
   if (!article) {
     return (
@@ -74,28 +86,34 @@ export default async function ArticlePage({ params }) {
     );
   }
 
+  // byline: author, date and reading time, whichever of them exist
+  const byline = [
+    article.author,
+    article.date && new Date(article.date + 'T00:00:00').toLocaleDateString('en-US',
+      { year: 'numeric', month: 'long', day: 'numeric' }),
+    `${article.readingMinutes} min read`,
+  ].filter(Boolean);
+
   return (
-    <article>
-      <div className="article-header">
-        {article.image && (
-          <img
-            src={article.image}
-            alt={article.title}
-            style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', marginBottom: '24px' }}
-          />
-        )}
+    <article className="article">
+      <header className="article-header">
         <h1>{article.title}</h1>
-        {article.date && (
-          <div className="article-meta">
-            {new Date(article.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-          </div>
-        )}
-      </div>
+        {byline.length > 0 && <div className="article-meta">{byline.join(' · ')}</div>}
+        {article.description && <p className="article-standfirst">{article.description}</p>}
+      </header>
+
+      {article.image && (
+        <img className="article-hero" src={article.image} alt={article.imageAlt} />
+      )}
+
       <div
         className="article-content"
         dangerouslySetInnerHTML={{ __html: article.content }}
-        style={{ maxWidth: '800px', margin: '0 auto' }}
       />
+
+      <footer className="article-footer">
+        <a href="/articles">&larr; All articles</a>
+      </footer>
     </article>
   );
 }
