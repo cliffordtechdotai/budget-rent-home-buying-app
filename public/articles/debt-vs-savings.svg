@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" width="680" height="240" role="img" aria-label="With 22% debt, putting everything toward the debt ends about 21,000 dollars ahead of putting everything into savings.">
+  <style>
+    .t { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; fill: #111111; }
+    .l { font: 400 12px 'JetBrains Mono', ui-monospace, monospace; fill: #555555; }
+    .n { font: 700 15px 'JetBrains Mono', ui-monospace, monospace; fill: #111111; }
+    .s { font: 400 11px 'JetBrains Mono', ui-monospace, monospace; fill: #8a6d00; }
+  </style>
+  <rect width="680" height="240" fill="#ffffff"/>
+  <rect x="0.5" y="0.5" width="679" height="239" fill="none" stroke="#e4e4e4"/>
+
+  <text class="t" x="24" y="34">$40,000 of debt at 22% &#183; where you land after 5 years</text>
+
+  <text class="l" x="24" y="76">All to savings</text>
+  <rect x="24" y="86" width="452" height="26" fill="#e4e4e4"/>
+  <text class="n" x="488" y="105">$118,335</text>
+  <text class="s" x="24" y="130">debt never gets paid off</text>
+
+  <text class="l" x="24" y="168">All to debt</text>
+  <rect x="24" y="178" width="533" height="26" fill="#111111"/>
+  <text class="n" x="569" y="197">$139,698</text>
+  <text class="l" x="24" y="222">debt cleared in 16 months</text>
+</svg>

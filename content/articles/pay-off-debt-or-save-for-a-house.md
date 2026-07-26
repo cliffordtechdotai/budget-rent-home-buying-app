@@ -54,6 +54,8 @@ debt still owed against them:
 | $1,500 | 20 months | $137,700 |
 | $2,000 | 16 months | $139,698 |
 
+![Putting everything toward the debt ends about $21,000 ahead of putting everything into savings](/articles/debt-vs-savings.svg)
+
 Sending everything at the debt leaves them **about $21,000 better off** than
 putting it all in savings. And look at that first row: with nothing extra going
 to the debt, it never gets paid off at all. The balance grows faster than the
