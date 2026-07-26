@@ -2,8 +2,7 @@
 title: "Should You Pay Off Debt First, or Save for a House?"
 author: "Curtis Clifford"
 date: "2026-07-26"
-category: "advice"
-tags: ["debt", "saving"]
+tags: ["advice", "debt", "saving"]
 description: "Every extra dollar toward debt is a dollar not in your down payment fund. Here is how to tell which one actually gets you into a house sooner."
 image: ""
 imageAlt: ""

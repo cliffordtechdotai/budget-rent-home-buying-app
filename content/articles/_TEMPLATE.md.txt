@@ -2,10 +2,14 @@
 title: "Your Headline Goes Here"
 author: "Curtis Clifford"
 date: "2026-07-26"
+tags: ["advice"]
 description: "One or two sentences. Shows under the title and is what Google displays in search results."
 image: ""
 imageAlt: ""
 ---
+
+Tags: pick from definitions, advice, renting, buying, saving, debt, mortgages.
+Leave the line out entirely and they get worked out from what you wrote.
 
 Open with a sentence or two that says what the reader will get. This first
 paragraph sits right under the heading, so make it count.

@@ -493,30 +493,43 @@ test('articles contain no em dashes or other AI-writing tells', () => {
   }
 });
 
-test('every article is filed under a real category', () => {
-  // An unknown category would silently drop the article off the index page, since
-  // the page only renders the sections it knows about.
-  const known = ['basics', 'advice', 'renting', 'buying'];
+const ALLOWED_TAGS = ['definitions', 'advice', 'renting', 'buying', 'saving', 'debt', 'mortgages'];
+
+test('every article tag comes from the fixed vocabulary', () => {
+  // Tags double as the categories, so an unrecognised one would create a stray tab
+  // and start the drift toward thirty near-duplicate tags.
   const dir = path.join(__dirname, '..', 'content', 'articles');
 
   for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
     const block = fs.readFileSync(path.join(dir, file), 'utf-8').split('---')[1] || '';
-    const cat = (block.match(/^category:\s*"?([a-z]+)"?/m) || [])[1];
-    // Missing is allowed: the index guesses one. A wrong value is not.
-    if (cat) assert.ok(known.includes(cat), `${file} uses category "${cat}", expected one of ${known.join(', ')}`);
+    const line = (block.match(/^tags:\s*\[(.*)\]/m) || [])[1];
+    if (!line) continue;                    // no tags is fine, the page works them out
+    const tags = line.split(',').map(t => t.trim().replace(/"/g, '')).filter(Boolean);
+    for (const tag of tags) {
+      assert.ok(ALLOWED_TAGS.includes(tag),
+        file + ' uses the tag "' + tag + '", which is not one of: ' + ALLOWED_TAGS.join(', '));
+    }
   }
 });
 
-test('no article is stranded off the index page', () => {
-  // Mirrors how the index groups articles, so a file can never quietly go missing.
-  const known = ['basics', 'advice', 'renting', 'buying'];
-  const dir = path.join(__dirname, '..', 'content', 'articles');
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+test('the tag list on the page matches the one these tests enforce', () => {
+  // If a tag is added to the page but not here, this check would start rejecting
+  // perfectly valid articles.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'app', 'articles', 'page.js'), 'utf-8');
+  const block = (src.match(/export const TAGS = \[([\s\S]*?)\]/) || [])[1] || '';
+  const inPage = (block.match(/'([a-z]+)'/g) || []).map(t => t.replace(/'/g, ''));
+  assert.deepStrictEqual(inPage.slice().sort(), ALLOWED_TAGS.slice().sort(),
+    'the page and the tests disagree about which tags exist');
+});
 
-  const shown = files.filter(file => {
+test('every article ends up with at least one tag', () => {
+  // An article with no usable tag would only ever show under All.
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+  for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
     const block = fs.readFileSync(path.join(dir, file), 'utf-8').split('---')[1] || '';
-    const cat = (block.match(/^category:\s*"?([a-z]+)"?/m) || [])[1];
-    return !cat || known.includes(cat);   // no category means it gets guessed into one
-  });
-  assert.strictEqual(shown.length, files.length, 'an article would not appear in any section');
+    const line = (block.match(/^tags:\s*\[(.*)\]/m) || [])[1] || '';
+    const tags = line.split(',').map(t => t.trim().replace(/"/g, '')).filter(Boolean);
+    const usable = tags.filter(t => ALLOWED_TAGS.includes(t));
+    assert.ok(usable.length > 0, file + ' has no usable tag, so it would only appear under All');
+  }
 });

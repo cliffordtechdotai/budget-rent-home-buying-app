@@ -1,37 +1,45 @@
 import fs from 'fs';
 import path from 'path';
-import Link from 'next/link';
 import matter from 'gray-matter';
+import ArticleList from './ArticleList';
 
 export const metadata = {
   title: 'Articles | House Planner',
   description: 'Plain-language guides to budgeting, saving a deposit, and deciding whether to rent or buy.',
 };
 
-// The sections articles get filed under, in the order they appear on the page.
-export const CATEGORIES = [
-  { key: 'basics', label: 'Start Here', blurb: 'What the terms mean and how the numbers fit together.' },
-  { key: 'advice', label: 'Making Decisions', blurb: 'Working out what to do with the money you have.' },
-  { key: 'renting', label: 'Renting', blurb: 'Staying put, and what it costs you or saves you.' },
-  { key: 'buying', label: 'Buying', blurb: 'Deposits, mortgages, and the cost of owning.' },
+// The full tag vocabulary. Tags double as the categories here, so the list stays
+// short on purpose. A test fails if an article uses anything outside it, which is
+// what stops it drifting into thirty near-duplicate variations.
+export const TAGS = [
+  'definitions',
+  'advice',
+  'renting',
+  'buying',
+  'saving',
+  'debt',
+  'mortgages',
 ];
 
-// Guesses a category from the title and text when an article arrives without one,
-// so a file dropped in with no category still lands somewhere sensible.
-function inferCategory(title, body) {
+// Picks tags from the title and text when a file arrives without any, so an
+// untagged draft still lands somewhere instead of being invisible.
+function inferTags(title, body) {
   const text = (title + ' ' + body).toLowerCase();
-  const score = {
-    basics: /what is|explained|glossary|getting started|guide to|means|definition/.test(text) ? 2 : 0,
-    advice: /should you|should i|worth it|better to|decide|choose|vs\.? |versus/.test(text) ? 2 : 0,
-    renting: (text.match(/\brent(ing|al)?\b/g) || []).length,
-    buying: (text.match(/\b(buy|buying|mortgage|deposit|down payment)\b/g) || []).length,
-  };
-  return Object.entries(score).sort((a, b) => b[1] - a[1])[0][1] > 0
-    ? Object.entries(score).sort((a, b) => b[1] - a[1])[0][0]
-    : 'basics';
+  const hits = [];
+  const count = re => (text.match(re) || []).length;
+
+  if (/what is|explained|glossary|means|definition/.test(text)) hits.push('definitions');
+  if (/should you|should i|worth it|better to|decide|versus/.test(text)) hits.push('advice');
+  if (count(/\brent(ing|al)?\b/g) >= 3) hits.push('renting');
+  if (count(/\b(buy|buying|purchase)\b/g) >= 3) hits.push('buying');
+  if (count(/\b(save|saving|savings|deposit|down payment)\b/g) >= 3) hits.push('saving');
+  if (count(/\bdebt\b/g) >= 3) hits.push('debt');
+  if (count(/\bmortgage/g) >= 3) hits.push('mortgages');
+
+  return hits.length ? hits : ['advice'];
 }
 
-async function getArticles() {
+function getArticles() {
   const dir = path.join(process.cwd(), 'content', 'articles');
   if (!fs.existsSync(dir)) return [];
 
@@ -40,22 +48,23 @@ async function getArticles() {
     .map(filename => {
       const { data, content } = matter(fs.readFileSync(path.join(dir, filename), 'utf-8'));
       const title = data.title || 'Untitled';
-      const known = CATEGORIES.some(c => c.key === data.category);
+      const given = Array.isArray(data.tags) ? data.tags.filter(t => TAGS.includes(t)) : [];
       return {
         slug: filename.replace('.md', ''),
         title,
         date: data.date || '',
         author: data.author || '',
         description: data.description || '',
-        category: known ? data.category : inferCategory(title, content),
-        tags: Array.isArray(data.tags) ? data.tags : [],
+        tags: given.length ? given : inferTags(title, content),
       };
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 
-export default async function ArticlesPage() {
-  const articles = await getArticles();
+export default function ArticlesPage() {
+  const articles = getArticles();
+  // only offer tabs for tags actually in use
+  const used = TAGS.filter(t => articles.some(a => a.tags.includes(t)));
 
   return (
     <div className="article">
@@ -67,44 +76,9 @@ export default async function ArticlesPage() {
         </p>
       </header>
 
-      {articles.length === 0 ? (
-        <p className="hint" style={{ textAlign: 'center' }}>No articles yet.</p>
-      ) : (
-        CATEGORIES.map(cat => {
-          const inCat = articles.filter(a => a.category === cat.key);
-          if (inCat.length === 0) return null;
-          return (
-            <section key={cat.key} className="cat-section">
-              <h2 className="cat-head">{cat.label}</h2>
-              <p className="cat-blurb">{cat.blurb}</p>
-              <div className="articles-list">
-                {inCat.map(article => (
-                  <article key={article.slug} className="article-item">
-                    <h2>
-                      <Link href={`/articles/${article.slug}`}>{article.title}</Link>
-                    </h2>
-                    {(article.author || article.date) && (
-                      <p className="article-date">
-                        {[
-                          article.author,
-                          article.date && new Date(article.date + 'T00:00:00')
-                            .toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-                        ].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                    {article.description && <p>{article.description}</p>}
-                    {article.tags.length > 0 && (
-                      <p className="tag-row">
-                        {article.tags.map(t => <span key={t} className="tag">{t}</span>)}
-                      </p>
-                    )}
-                  </article>
-                ))}
-              </div>
-            </section>
-          );
-        })
-      )}
+      {articles.length === 0
+        ? <p className="hint" style={{ textAlign: 'center' }}>No articles yet.</p>
+        : <ArticleList articles={articles} tags={used} />}
     </div>
   );
 }
