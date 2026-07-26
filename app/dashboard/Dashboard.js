@@ -894,7 +894,13 @@ function renderCustomPayoff(c){
 function renderOverviewStats(c){
     const {takeHome,expenses,monthlySave,debtMonthly,goalTotal}=c;
     let mortExtra=numVal("mortExtra");
-    let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal-mortExtra;
+    // Extra mortgage principal is a post-purchase what-if: it only starts once you own
+    // the house, at which point the down-payment saving has stopped and freed up that
+    // money. Subtracting both from today's budget double-counts the same dollars, and
+    // it made the overview fail to add up - the grid shows five figures, so leftover has
+    // to be those five, not five minus an invisible sixth. Its own slider cap already
+    // models the post-purchase pool.
+    let leftover=takeHome-expenses-monthlySave-debtMonthly-goalTotal;
     document.getElementById("incomeStat").textContent=money(takeHome);
     document.getElementById("expenseStat").textContent=money(expenses);
     document.getElementById("saveStat").textContent=money(monthlySave);
@@ -916,13 +922,13 @@ function renderOverviewStats(c){
     if(monthlySave>0) bd.push(\`− \${money(monthlySave)} house savings\`);
     if(debtMonthly>0) bd.push(\`− \${money(debtMonthly)} debt payment\`);
     if(goalTotal>0) bd.push(\`− \${money(goalTotal)} goals\`);
-    if(mortExtra>0) bd.push(\`− \${money(mortExtra)} extra to mortgage\`);
     bd.push(\`= \${money(leftover)} left over\`);
+    if(mortExtra>0) bd.push(\`(\${money(mortExtra)} extra mortgage principal is not counted here - it starts after you buy, when house savings stop)\`);
     let breakdownText=bd.join("  ");
     let noteEl=document.getElementById("overviewNote");
     noteEl.innerHTML = (leftover<0
         ? \`<span class="flag-bad">You're over budget by \${money(-leftover)}. Trim expenses or lower a target.</span>\`
-        : \`Left over is money not yet assigned. Slide it into savings, debt, or extra mortgage payments to put it to work.\`)
+        : \`Left over is money not yet assigned. Slide it into savings, debt, or other goals to put it to work.\`)
         + \` <span class="info" title="\${breakdownText}">i</span>\`;
     return {mortExtra,leftover};
 }
@@ -1254,6 +1260,18 @@ function calculateAll(){
     R("Monthly Budget","Debt payment",money(debtMonthly),debtMonthly);
     R("Monthly Budget","Other goals",money(goalTotal),goalTotal);
     R("Monthly Budget","Left over",money(leftover),leftover);
+
+    // A spreadsheet loses the on-screen warnings, so carry them into the file. Otherwise
+    // a debt with no rate entered exports as a confident "$0 total interest" with nothing
+    // saying the rate was never supplied.
+    if(anyDebt){
+        let rateBlank = perDebtOn
+            ? debtRows.some(r=>r.balance>0 && String((document.getElementById(r.id+"_rate")||{}).value||"").trim()==="")
+            : String(document.getElementById("lumpRate").value||"").trim()==="";
+        if(rateBlank) R("Check These","Debt interest rate","NOT ENTERED - payoff time and interest above assume 0%",null);
+    }
+    if(numVal("mortgageRate")<=0) R("Check These","Mortgage rate","NOT ENTERED - payments above assume an interest-free loan",null);
+    R("Check These","Figures are estimates","Not financial or tax advice",null);
 
     R("Mortgage Assumptions","Interest rate",rptRate+"%",rptRate);
     R("Mortgage Assumptions","Tax + insurance + maint.",taxPct+"%/yr",taxPct);
