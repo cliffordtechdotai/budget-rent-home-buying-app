@@ -1446,21 +1446,20 @@ calculateAll();
 `;
 
 export default function Dashboard() {
+  // Deliberately a ref rather than a flag on window. Navigating away and back can
+  // leave the outgoing page mounted while the incoming one renders, and with a
+  // global flag the new instance would see the old one's value, skip setup, and
+  // leave the freshly rendered markup empty - which is what made the warnings and
+  // figures vanish after visiting another page. A ref belongs to one instance, so
+  // a remount always initialises while Strict Mode's double-invoke stays guarded.
+  const started = useRef(false);
+
   useEffect(() => {
-    // useEffect already runs after the DOM (including the dangerouslySetInnerHTML
-    // markup below) has been committed, so no delay is needed here. Guard against
-    // double-init (React Strict Mode's dev double-invoke, or a Fast Refresh remount
-    // while a previous run's listeners are still attached) with a flag that's reset
-    // on cleanup, instead of leaving orphaned script tags/listeners piled up.
-    if (window.__dashboardInitialized) return;
-    window.__dashboardInitialized = true;
-
-    const run = new Function(DASHBOARD_SCRIPT);
-    run();
-
-    return () => {
-      window.__dashboardInitialized = false;
-    };
+    if (started.current) return;
+    started.current = true;
+    // useEffect runs after the markup below is in the document, so the script can
+    // find the elements it needs immediately.
+    new Function(DASHBOARD_SCRIPT)();
   }, []);
 
   return (

@@ -234,3 +234,11 @@ input.over { border-color:var(--bad); color:var(--bad); }
 .rvb-own { border-top-style:solid; border-top-color:var(--ink); }
 .rvb-rent { border-top-style:dashed; border-top-color:var(--ink-faint); }
 .rvb-note { line-height:1.6; }
+
+/* Article categories and tags */
+.cat-section { margin-bottom:36px; }
+.cat-head { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:var(--ink); margin:0 0 4px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+.cat-blurb { font-size:13px; color:var(--ink-faint); margin:10px 0 16px; }
+.tag-row { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
+.tag { font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); background:#f0f0f0; border-radius:3px; padding:3px 8px; }
+.article-cat { display:inline-block; font-size:10.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-faint); margin-bottom:10px; }

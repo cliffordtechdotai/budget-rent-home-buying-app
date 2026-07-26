@@ -10,11 +10,8 @@ function Nav({ pathname }) {
   return (
     <nav>
       <div className="nav-inner">
-        <Link href="/" className="logo">
+        <Link href="/" className={"logo" + (pathname === "/" ? " active" : "")}>
           House Planner
-        </Link>
-        <Link href="/" className={pathname === '/' ? 'active' : ''}>
-          Dashboard
         </Link>
         <Link href="/rent-vs-buy" className={pathname==="/rent-vs-buy"?"active":""}>
           Rent or Buy

@@ -2,6 +2,8 @@
 title: "Should You Pay Off Debt First, or Save for a House?"
 author: "Curtis Clifford"
 date: "2026-07-26"
+category: "advice"
+tags: ["debt", "saving"]
 description: "Every extra dollar toward debt is a dollar not in your down payment fund. Here is how to tell which one actually gets you into a house sooner."
 image: ""
 imageAlt: ""
@@ -41,7 +43,7 @@ second effect is the one people miss.
 
 ## What it looks like with expensive debt
 
-Take someone with **$40,000 of debt at 22%** ,  a realistic credit card rate. Their
+Take someone with **$40,000 of debt at 22%**, a realistic credit card rate. Their
 minimum payment is $1,000 a month, and they have another $2,000 a month they can
 split however they like. Here is where they stand after five years, counting any
 debt still owed against them:
@@ -66,7 +68,7 @@ minimum payment can knock it down.
 
 ## What it looks like with cheap debt
 
-Now the same person, same everything, except the debt is at **3%** ,  a subsidised
+Now the same person, same everything, except the debt is at **3%**, a subsidised
 student loan, a family loan, a promotional rate:
 
 | Extra toward debt | Debt gone in | Down payment after 5 years |
@@ -77,7 +79,7 @@ student loan, a family loan, a promotional rate:
 | $1,500 | 17 months | $146,029 |
 | $2,000 | 14 months | $146,420 |
 
-The spread between best and worst is about **$1,200 on a $147,000 balance** ,  under
+The spread between best and worst is about **$1,200 on a $147,000 balance**, under
 one percent. Financially these are the same decision.
 
 So if being debt-free would let you sleep at night, do that. If you would rather
@@ -101,7 +103,7 @@ The rates above are examples. Yours are what matter.
 
 The [House Planner calculator](/) has this comparison built into the Debt Payoff
 section. Enter your balance, your rate, and what you can spare each month, and it
-will show you the payoff date and resulting down payment for each split ,  plus a
+will show you the payoff date and resulting down payment for each split, plus a
 plain-language verdict on whether the difference is worth caring about.
 
 If you want the reasoning behind the rest of the tool, start with

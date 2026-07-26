@@ -62,6 +62,13 @@ function project(rent, price, rate) {
 
 const money = n => '$' + Math.round(n).toLocaleString('en-US');
 
+// Axis labels get abbreviated: a full "$1,082,881" overflows the chart's left margin
+// and renders clipped.
+const shortMoney = n =>
+  n >= 1e6 ? '$' + (n / 1e6).toFixed(1) + 'M'
+  : n >= 1e3 ? '$' + Math.round(n / 1e3) + 'k'
+  : '$' + Math.round(n);
+
 export default function RentVsBuy() {
   const [rent, setRent] = useState(2200);
   const [price, setPrice] = useState(400000);
@@ -129,7 +136,7 @@ export default function RentVsBuy() {
               <g key={f}>
                 <line x1={PAD.l} x2={W - PAD.r} y1={y(maxY * f)} y2={y(maxY * f)} stroke="#e4e4e4" />
                 <text x={PAD.l - 8} y={y(maxY * f) + 4} textAnchor="end" className="rvb-axis">
-                  {money(maxY * f)}
+                  {shortMoney(maxY * f)}
                 </text>
               </g>
             ))}

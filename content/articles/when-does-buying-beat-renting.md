@@ -2,6 +2,8 @@
 title: "When Does Buying Actually Beat Renting?"
 author: "Curtis Clifford"
 date: "2026-07-26"
+category: "renting"
+tags: ["renting", "buying", "timing"]
 description: "Renting leaves you with more money at first. Buying wins eventually. Here is roughly where the line sits, and what moves it."
 image: ""
 imageAlt: ""

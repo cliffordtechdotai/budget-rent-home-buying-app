@@ -2,6 +2,8 @@
 title: "Getting Started: Renting vs. Buying"
 author: "Curtis Clifford"
 date: "2026-07-24"
+category: "basics"
+tags: ["renting", "buying", "getting started"]
 description: "A primer on the trade-offs between renting and buying, and how this calculator can help you decide."
 image: ""
 ---

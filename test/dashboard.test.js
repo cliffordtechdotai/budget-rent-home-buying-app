@@ -492,3 +492,31 @@ test('articles contain no em dashes or other AI-writing tells', () => {
     }
   }
 });
+
+test('every article is filed under a real category', () => {
+  // An unknown category would silently drop the article off the index page, since
+  // the page only renders the sections it knows about.
+  const known = ['basics', 'advice', 'renting', 'buying'];
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+
+  for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
+    const block = fs.readFileSync(path.join(dir, file), 'utf-8').split('---')[1] || '';
+    const cat = (block.match(/^category:\s*"?([a-z]+)"?/m) || [])[1];
+    // Missing is allowed: the index guesses one. A wrong value is not.
+    if (cat) assert.ok(known.includes(cat), `${file} uses category "${cat}", expected one of ${known.join(', ')}`);
+  }
+});
+
+test('no article is stranded off the index page', () => {
+  // Mirrors how the index groups articles, so a file can never quietly go missing.
+  const known = ['basics', 'advice', 'renting', 'buying'];
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+
+  const shown = files.filter(file => {
+    const block = fs.readFileSync(path.join(dir, file), 'utf-8').split('---')[1] || '';
+    const cat = (block.match(/^category:\s*"?([a-z]+)"?/m) || [])[1];
+    return !cat || known.includes(cat);   // no category means it gets guessed into one
+  });
+  assert.strictEqual(shown.length, files.length, 'an article would not appear in any section');
+});

@@ -32,6 +32,8 @@ async function getArticle(slug) {
     title: data.title || 'Untitled',
     date: data.date || '',
     author: data.author || '',
+    category: data.category || '',
+    tags: Array.isArray(data.tags) ? data.tags : [],
     description: data.description || '',
     image: data.image || '',
     imageAlt: data.imageAlt || data.title || '',
@@ -101,6 +103,7 @@ export default async function ArticlePage({ params }) {
   return (
     <article className="article">
       <header className="article-header">
+        {article.category && <div className="article-cat">{article.category}</div>}
         <h1>{article.title}</h1>
         {byline.length > 0 && <div className="article-meta">{byline.join(' · ')}</div>}
         {article.description && <p className="article-standfirst">{article.description}</p>}
