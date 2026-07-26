@@ -12,7 +12,7 @@ Welcome to House Planner. This article is a quick guide to thinking about one of
 
 ## Why You Might Rent
 
-Renting gives you flexibility. If your job moves, your lease ends and you can go. You're not responsible for major repairs—the landlord is. Your housing cost is predictable month to month (though rent does tend to rise over time).
+Renting gives you flexibility. If your job moves, your lease ends and you can go. You're not responsible for major repairs, the landlord is. Your housing cost is predictable month to month (though rent does tend to rise over time).
 
 Renting also lets you stay liquid. Money that would go to a down payment, property taxes, or maintenance stays in your pocket or gets invested elsewhere.
 
@@ -26,7 +26,7 @@ Buying also gives you control. You can renovate, paint, plant a garden. It's you
 
 ## The Real Question
 
-It's not "rent or buy"—it's "rent or buy *now*." The calculator helps you model both paths:
+It's not "rent or buy", it's "rent or buy *now*." The calculator helps you model both paths:
 
 1. **Keep renting** for the next N years while you save.
 2. **Buy as soon as you hit** the targets (down payment saved, payment affordable).
@@ -55,7 +55,7 @@ The calculator uses real tax brackets and rates for federal and state income tax
 
 - Adjust your expenses: be honest about what you actually spend.
 - Play with different savings rates and mortgage prices.
-- Check the rent vs. buy breakdown at the bottom—it shows you the real cost of waiting.
+- Check the rent vs. buy breakdown at the bottom, it shows you the real cost of waiting.
 
 Ready to run your own numbers? [Open the calculator](/) and start with your take-home pay.
 

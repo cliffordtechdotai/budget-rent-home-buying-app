@@ -413,7 +413,16 @@ test('article links point somewhere that exists', () => {
   // internal link to a page or article that is not there.
   const dir = path.join(__dirname, '..', 'content', 'articles');
   const slugs = fs.readdirSync(dir).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''));
-  const realPages = ['/', '/articles', '/privacy', ...slugs.map(s => `/articles/${s}`)];
+
+  // Discover the real routes from the app folder rather than hardcoding them, so
+  // adding a page does not silently make this check wrong.
+  const appDir = path.join(__dirname, '..', 'app');
+  const routes = ['/'];
+  for (const entry of fs.readdirSync(appDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('[')) continue;
+    if (fs.existsSync(path.join(appDir, entry.name, 'page.js'))) routes.push('/' + entry.name);
+  }
+  const realPages = [...routes, ...slugs.map(s => `/articles/${s}`)];
 
   for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
     const body = fs.readFileSync(path.join(dir, file), 'utf-8');
@@ -463,4 +472,23 @@ test('markdown tables turn into real tables', async () => {
   assert.match(out, /<table>/, 'the table did not become a real table');
   assert.match(out, /<th>A<\/th>/, 'the header row is missing');
   assert.ok(!out.includes('| A | B |'), 'raw pipe characters are still showing');
+});
+
+test('articles contain no em dashes or other AI-writing tells', () => {
+  // Em dashes are the clearest giveaway. Plain punctuation reads more like a person.
+  const dir = path.join(__dirname, '..', 'content', 'articles');
+  const banned = [
+    ['\u2014', 'em dash (use a comma, a full stop, or brackets)'],
+    ['\u2013', 'en dash (use "to" for ranges, e.g. 5 to 10)'],
+    ['\u201C', 'curly quote (use a plain " instead)'],
+    ['\u2018', 'curly apostrophe (use a plain \' instead)'],
+  ];
+
+  for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) {
+    const raw = fs.readFileSync(path.join(dir, file), 'utf-8');
+    for (const [char, why] of banned) {
+      const line = raw.split('\n').findIndex(l => l.includes(char));
+      assert.ok(line === -1, `${file} line ${line + 1} contains an ${why}`);
+    }
+  }
 });

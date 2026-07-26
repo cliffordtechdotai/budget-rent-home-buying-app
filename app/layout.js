@@ -16,6 +16,9 @@ function Nav({ pathname }) {
         <Link href="/" className={pathname === '/' ? 'active' : ''}>
           Dashboard
         </Link>
+        <Link href="/rent-vs-buy" className={pathname==="/rent-vs-buy"?"active":""}>
+          Rent or Buy
+        </Link>
         <Link href="/articles" className={pathname.startsWith('/articles') ? 'active' : ''}>
           Articles
         </Link>

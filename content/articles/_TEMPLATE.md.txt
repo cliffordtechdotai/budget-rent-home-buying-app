@@ -24,7 +24,7 @@ An ordinary link looks like this: [the down payment calculator](/).
 Linking to another site works the same way:
 [Consumer Financial Protection Bureau](https://www.consumerfinance.gov/).
 
-Link to your own pages with a slash and no domain — `/`, `/articles`,
+Link to your own pages with a slash and no domain ,  `/`, `/articles`,
 `/privacy`, or `/articles/some-other-article`.
 
 ## Lists
@@ -58,7 +58,7 @@ Put the file in `public/articles/` then reference it without that folder name:
 
 ![Describe the image for screen readers](/articles/your-image.jpg)
 
-For a big image at the very top of the article, don't put it in the body —
+For a big image at the very top of the article, don't put it in the body , 
 set `image:` in the block at the top of this file instead.
 
 ---

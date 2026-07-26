@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 300" width="680" height="300" role="img" aria-label="Renting is ahead for the first four years. Owning overtakes it in year four and the gap widens steadily after that.">
+  <style>
+    .t { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; fill: #111111; }
+    .a { font: 400 10px 'JetBrains Mono', ui-monospace, monospace; fill: #8a8a8a; }
+    .k { font: 400 11px 'JetBrains Mono', ui-monospace, monospace; fill: #555555; }
+    .c { font: 600 11px 'JetBrains Mono', ui-monospace, monospace; fill: #1f7a3d; }
+  </style>
+  <rect width="680" height="300" fill="#ffffff"/>
+  <rect x="0.5" y="0.5" width="679" height="299" fill="none" stroke="#e4e4e4"/>
+
+  <text class="t" x="24" y="30">Rent $2,200 vs a $400,000 house at 6.5%</text>
+
+  <line x1="86" y1="60" x2="640" y2="60" stroke="#e4e4e4"/>
+  <line x1="86" y1="140" x2="640" y2="140" stroke="#e4e4e4"/>
+  <line x1="86" y1="220" x2="640" y2="220" stroke="#e4e4e4"/>
+  <text class="a" x="78" y="64" text-anchor="end">$400k</text>
+  <text class="a" x="78" y="144" text-anchor="end">$200k</text>
+  <text class="a" x="78" y="224" text-anchor="end">$0</text>
+
+  <!-- renting: 98,817 / 111,192 / 121,674 / 130,000 / 142,226 / 165,212 -->
+  <polyline fill="none" stroke="#8a8a8a" stroke-width="2" stroke-dasharray="5 4"
+    points="86,180 165,175 244,171 323,168 442,163 640,154"/>
+
+  <!-- owning: 71,013 / 102,828 / 137,213 / 174,424 / 240,594 / 387,411 -->
+  <polyline fill="none" stroke="#111111" stroke-width="2.5"
+    points="86,192 165,179 244,165 323,150 442,124 640,65"/>
+
+  <line x1="279" y1="52" x2="279" y2="220" stroke="#1f7a3d" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="279" cy="168" r="4" fill="#1f7a3d"/>
+  <text class="c" x="287" y="48">buying pulls ahead, year 4</text>
+
+  <text class="a" x="86" y="238" text-anchor="middle">yr 1</text>
+  <text class="a" x="244" y="238" text-anchor="middle">yr 5</text>
+  <text class="a" x="442" y="238" text-anchor="middle">yr 10</text>
+  <text class="a" x="640" y="238" text-anchor="middle">yr 15</text>
+
+  <line x1="24" y1="264" x2="44" y2="264" stroke="#111111" stroke-width="2.5"/>
+  <text class="k" x="52" y="268">Owning: equity after selling costs</text>
+  <line x1="330" y1="264" x2="350" y2="264" stroke="#8a8a8a" stroke-width="2" stroke-dasharray="5 4"/>
+  <text class="k" x="358" y="268">Renting: deposit and savings, invested</text>
+</svg>
