@@ -33,7 +33,7 @@ const FLAT_FIELD_IDS = ["householdType","calcFromGross","stateSelect","yearlyInc
 // an expanded one would stretch to the row height and render as a tall empty box, and a
 // second collapse level next to the stage's earns nothing. Only stages and full-width
 // cards that own their row collapse.
-const COLLAPSIBLE_IDS = ["stageMoney","stageObligations","stageHouse","mortgageResultsCard","customPayoffCard","overviewCard"];
+const COLLAPSIBLE_IDS = ["stageMoney","stageObligations","stageHouse","customPayoffCard","overviewCard"];
 
 const DEFAULT_STATE = "PA";
 const THRESHOLD = 28;
@@ -1665,7 +1665,7 @@ export default function Dashboard() {
 <div class="stage-body">
 <div class="dashboard">
 
-<div class="card" id="downSavingsCard">
+<div class="card wide" id="downSavingsCard">
 <h2>Down Payment Savings <span class="info hinfo" title="How much you set aside for a house each month, plus anything already saved.">i</span></h2>
 <div class="collapse-body" id="downSavingsBody">
 <label>Monthly Amount Set Aside for a House</label>
@@ -1690,7 +1690,7 @@ export default function Dashboard() {
 </div>
 </div>
 
-<div class="card" id="mortgageSettingsCard">
+<div class="card wide" id="mortgageSettingsCard">
 <h2>Mortgage & Affordability <span class="info hinfo" title="Shows what home price you can afford at your current savings pace, or how long it'll take to afford a specific price you have in mind.">i</span></h2>
 <div class="collapse-body" id="mortgageSettingsBody">
 
@@ -1725,13 +1725,10 @@ export default function Dashboard() {
 <label style="font-weight:normal;margin:0;">Be debt-free before buying <span class="info" title="On (recommended): once your debt clears, that freed-up payment automatically rolls into house savings - this applies to your Down Payment Savings projection and the Max-Afford price too, not just the Custom Price search below. Off: model buying while still carrying debt.">i</span></label>
 </div>
 </div>
-</div>
 
-<div class="card wide" id="mortgageResultsCard">
-<h2 class="collapsible" onclick="toggleCollapse('mortgageResultsCard')">30yr vs 15yr Results <span class="hdr-sum" id="mortgageResultsSum"></span><span class="chevron">⌄</span></h2>
-<div class="collapse-body" id="mortgageResultsBody">
 <div id="maxAffordBlock">
-<div class="hint" style="margin-top:8px;margin-bottom:4px;">Based on your Down Payment Savings pace (Section 5) and the affordability target below.</div>
+<div class="section-head">What you can afford <span class="hdr-sum" id="mortgageResultsSum"></span></div>
+<div class="hint" style="margin-bottom:8px;">At the savings pace you set in Down Payment Savings, keeping to your 20% deposit and 28% payment targets.</div>
 <div class="compare" id="maxAffordResult" style="margin-top:10px;"></div>
 <div id="scenarioStrip"></div>
 <div class="hint" id="leftoverApplyNote" style="margin-top:10px;"></div>
@@ -1782,7 +1779,6 @@ export default function Dashboard() {
 
 <div class="writeup" id="optimalWriteup" style="font-size:14.5px;color:var(--ink);"></div>
 <div class="hint" style="margin-top:12px;">Assumes today's price and rate hold steady.</div>
-</div>
 </div>
 </div>
 
