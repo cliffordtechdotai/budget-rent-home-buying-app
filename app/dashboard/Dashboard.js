@@ -524,13 +524,18 @@ function buildOptimalColumn(label,term,price,rate,takeHome,inc,opts){
     let tgtPct=opts.targetPaymentPct||THRESHOLD;
     if(!r) return \`<div class="plan"><h3>\${label}</h3><div class="big flag-bad">—</div><div style="text-align:center;font-size:13px;color:#ff8f88;">Even after \${MAX_SEARCH_YEARS} years you can't reach the targets. Try a lower price, more savings, or a longer term.</div></div>\`;
     if(r.paidOff) return \`<div class="plan"><h3>\${label}</h3><div class="big flag-ok">Pay cash</div><div class="summary-line"><span>Savings reach price in</span><span>\${r.year} yr</span></div><div style="text-align:center;margin-top:8px;font-size:13px;" class="flag-ok">Enough to buy outright, no mortgage needed.</div></div>\`;
-    let headline=r.year===0?"Buy now":\`Rent \${r.year} yr\${r.year>1?"s":""}\`;
+    // Say the same thing two ways: how long you're renting, and the month you'd buy.
+    // A duration alone is hard to picture; a bare date makes you do the subtraction.
+    let buyDate=fmtDate(addMonths(getStartDate(),Math.round(r.year*12)));
+    let headline=r.year===0?"Buy now":\`Keep renting \${r.year} more year\${r.year>1?"s":""}\`;
+    let sub=r.year===0?"you're already in range":\`until \${buyDate}\`;
     return \`<div class="plan"><h3>\${label}</h3><div class="big flag-ok">\${headline}</div>
-        <div class="summary-line"><span>Buy around</span><span>\${r.year===0?"now":fmtDate(addMonths(getStartDate(),Math.round(r.year*12)))}</span></div>
-        <div class="summary-line"><span>Down payment then</span><span>\${money(r.down)}</span></div>
+        <div style="text-align:center;margin:-8px 0 12px;font-size:12px;color:rgba(255,255,255,0.6);">\${sub}</div>
+        <div class="summary-line"><span>You'd buy around</span><span>\${r.year===0?"now":buyDate}</span></div>
+        <div class="summary-line"><span>Saved up by then</span><span>\${money(r.down)}</span></div>
         <div class="summary-line"><span>Mortgage payment</span><span>\${money(r.payment)}/mo</span></div>
         <div class="summary-line"><span>% of take-home</span><span class="flag-ok">\${r.percent.toFixed(1)}%</span></div>
-        \${r.year>0?\`<div class="summary-line"><span>Rent paid while waiting</span><span>\${money(rentPaidOverYears(r.year))}</span></div>\`:""}</div>\`;
+        \${r.year>0?\`<div class="summary-line"><span>Rent paid meanwhile</span><span>\${money(rentPaidOverYears(r.year))}</span></div>\`:""}</div>\`;
 }
 
 // Dynamic rows
@@ -852,9 +857,21 @@ function buildReportText(){
     return out.join(CRLF);
 }
 
-function downloadFile(name, text, mime){
+// Offers a real Save-As dialog where the browser supports one, so exports behave like
+// the JSON save rather than silently landing in Downloads under a fixed name. Falls back
+// to a plain download on Firefox/Safari, which have no file picker.
+async function downloadFile(name, text, mime, desc, ext){
+    if("showSaveFilePicker" in window){
+        try{
+            let accept={}; accept[mime.split(";")[0]]=[ext];
+            let handle=await window.showSaveFilePicker({suggestedName:name,types:[{description:desc,accept}]});
+            let w=await handle.createWritable(); await w.write(text); await w.close();
+            return "saved";
+        }catch(e){ if(e.name==="AbortError") return "cancelled"; /* fall through on failure */ }
+    }
     let b=new Blob([text],{type:mime}), u=URL.createObjectURL(b), a=document.createElement("a");
     a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
+    return "downloaded";
 }
 
 // Accelerated-payoff what-if plus the milestone timeline. Pure rendering: consumes
@@ -1370,15 +1387,18 @@ window.applyPreset=applyPreset;
 // Be debt-free), so omitting it threw ReferenceError on click.
 // CSV opens directly in Google Sheets / Excel with no account, API key or upload -
 // the file never leaves the device, which keeps the privacy promise intact.
-window.exportCSV=function(){
+window.exportCSV=async function(){
     if(!lastReport.length){ showMsg("Enter your numbers first."); return; }
-    downloadFile("home-buying-plan.csv", buildReportCSV(), "text/csv;charset=utf-8;");
-    showMsg("Downloaded CSV - open it in Sheets with File > Import.");
+    let how=await downloadFile("home-buying-plan.csv", buildReportCSV(), "text/csv;charset=utf-8;", "CSV spreadsheet", ".csv");
+    if(how==="cancelled") return;
+    showMsg(how==="saved" ? "Spreadsheet saved. Open it in Sheets with File > Import."
+                          : "Spreadsheet downloaded. Open it in Sheets with File > Import.");
 };
-window.exportText=function(){
+window.exportText=async function(){
     if(!lastReport.length){ showMsg("Enter your numbers first."); return; }
-    downloadFile("home-buying-plan.txt", buildReportText(), "text/plain;charset=utf-8;");
-    showMsg("Downloaded plain-text summary.");
+    let how=await downloadFile("home-buying-plan.txt", buildReportText(), "text/plain;charset=utf-8;", "Text file", ".txt");
+    if(how==="cancelled") return;
+    showMsg(how==="saved" ? "Summary saved." : "Summary downloaded.");
 };
 
 window.calculateAll=calculateAll;
@@ -1452,8 +1472,8 @@ export default function Dashboard() {
 <button class="secondary" onclick="saveAsFile()" title="Saves everything to a budget-dashboard-data.json file on your computer. Your entries are also kept automatically in this browser, but that copy is tied to this device only - use this for a real backup.">Save As...</button>
 <button class="secondary" onclick="saveOverwrite()" title="Writes back to the file you picked earlier in this visit. Refreshing the page makes the browser forget which file that was, so after a reload this asks you where to save again.">Overwrite Last Saved File</button>
 <button class="secondary" onclick="loadFromFile()" title="Loads a budget-dashboard-data.json file you saved earlier.">Load Saved File</button>
-<button class="secondary" onclick="exportCSV()" title="Downloads your results as a .csv spreadsheet. Open it in Google Sheets (File > Import > Upload) or Excel. Includes a raw Amount column so you can build formulas on top of it.">Export Spreadsheet (CSV)</button>
-<button class="secondary" onclick="exportText()" title="Downloads a plain-text summary of your plan, laid out in labelled sections.">Export Summary (TXT)</button>
+<button class="secondary" onclick="exportCSV()" title="Saves your results as a .csv spreadsheet - you choose where. Open it in Google Sheets (File > Import > Upload) or Excel. Includes a raw Amount column so you can build formulas on top of it.">Export Spreadsheet (CSV)</button>
+<button class="secondary" onclick="exportText()" title="Saves a plain-text summary of your plan - you choose where, laid out in labelled sections.">Export Summary (TXT)</button>
 <button class="secondary danger" onclick="clearAll()">Clear All</button>
 </div>
 <div class="saveMsg" id="saveMsg"></div>
