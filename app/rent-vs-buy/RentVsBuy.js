@@ -134,7 +134,7 @@ export default function RentVsBuy() {
               : 'Renting stays ahead for the whole fifteen years at these numbers.'}>
             {[0, 0.5, 1].map(f => (
               <g key={f}>
-                <line x1={PAD.l} x2={W - PAD.r} y1={y(maxY * f)} y2={y(maxY * f)} stroke="#e4e4e4" />
+                <line x1={PAD.l} x2={W - PAD.r} y1={y(maxY * f)} y2={y(maxY * f)} style={{ stroke: 'var(--line)' }} />
                 <text x={PAD.l - 8} y={y(maxY * f) + 4} textAnchor="end" className="rvb-axis">
                   {shortMoney(maxY * f)}
                 </text>
@@ -143,13 +143,13 @@ export default function RentVsBuy() {
             {[1, 5, 10, 15].map(yr => (
               <text key={yr} x={x(yr)} y={H - 8} textAnchor="middle" className="rvb-axis">yr {yr}</text>
             ))}
-            <path d={line('renter')} fill="none" stroke="#8a8a8a" strokeWidth="2" strokeDasharray="5 4" />
-            <path d={line('owner')} fill="none" stroke="#111111" strokeWidth="2.5" />
+            <path d={line('renter')} fill="none" style={{ stroke: 'var(--ink-faint)' }} strokeWidth="2" strokeDasharray="5 4" />
+            <path d={line('owner')} fill="none" style={{ stroke: 'var(--ink)' }} strokeWidth="2.5" />
             {cross && (
               <g>
                 <line x1={x(cross.year)} x2={x(cross.year)} y1={PAD.t} y2={H - PAD.b}
-                  stroke="#1f7a3d" strokeWidth="1" strokeDasharray="3 3" />
-                <circle cx={x(cross.year)} cy={y(cross.owner)} r="4" fill="#1f7a3d" />
+                  style={{ stroke: 'var(--ok)' }} strokeWidth="1" strokeDasharray="3 3" />
+                <circle cx={x(cross.year)} cy={y(cross.owner)} r="4" style={{ fill: 'var(--ok)' }} />
               </g>
             )}
           </svg>

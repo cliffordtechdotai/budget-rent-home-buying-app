@@ -1,32 +1,23 @@
 import './globals.css';
-import Link from 'next/link';
+import Nav from './Nav';
 
 export const metadata = {
-  title: 'Home Buying Readiness Dashboard',
+  title: 'House Planner — Rent or Buy, Planned Simply',
   description: 'A free, privacy-first budgeting and house-planning calculator. Everything runs client-side — no data leaves your machine.',
 };
 
-function Nav({ pathname }) {
-  return (
-    <nav>
-      <div className="nav-inner">
-        <Link href="/" className={"logo" + (pathname === "/" ? " active" : "")}>
-          House Planner
-        </Link>
-        <Link href="/rent-vs-buy" className={pathname==="/rent-vs-buy"?"active":""}>
-          Rent or Buy
-        </Link>
-        <Link href="/articles" className={pathname.startsWith('/articles') ? 'active' : ''}>
-          Articles
-        </Link>
-        <Link href="/privacy" className={pathname === '/privacy' ? 'active' : ''}>
-          Privacy
-        </Link>
-        <div className="nav-spacer"></div>
-      </div>
-    </nav>
-  );
-}
+// Sets the theme class before React hydrates, so there's no flash of the
+// wrong theme on load. Reads localStorage first, then falls back to the
+// browser/OS preference.
+const THEME_INIT = `
+(function() {
+  try {
+    var stored = localStorage.getItem('theme');
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {}
+})();
+`;
 
 function Footer() {
   return (
@@ -34,6 +25,8 @@ function Footer() {
       <div className="footer-inner">
         <p>
           © 2024–{new Date().getFullYear()} House Planner. All calculations run client-side — your financial data never leaves your device.
+          {' '}·{' '}
+          <a href="/privacy">Privacy</a>
         </p>
       </div>
     </footer>
@@ -42,9 +35,12 @@ function Footer() {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body>
-        <Nav pathname={typeof window !== 'undefined' ? window.location.pathname : '/'} />
+        <Nav />
         <main>{children}</main>
         <Footer />
       </body>
